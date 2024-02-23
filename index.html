@@ -11,8 +11,32 @@
   </head>
   <body>
     <div class="container">
-      <h1 class="title">2D Data Viewer</h1>
-      <div id="viewport" class="screen"></div>
+      <div class="title"><h1>2D Data Viewer</h1></div>
+      <div class="screen" id="fullviewport"><div id="viewport"></div></div>
+      <div class="tools">
+        <button class="btn" id="reset">
+          <i class="fa fa-refresh fa-2x"></i>
+        </button>
+        <button class="btn" id="scale-up">
+          <i class="fa fa-plus-circle fa-2x"></i>
+        </button>
+        <button class="btn" id="scale-down">
+          <i class="fa fa-minus-circle fa-2x"></i>
+        </button>
+        <button class="btn" id="move-left">
+          <i class="fa fa-arrow-circle-left fa-2x"></i>
+        </button>
+        <button class="btn" id="move-right">
+          <i class="fa fa-arrow-circle-right fa-2x"></i>
+        </button>
+        <button class="btn" id="move-up">
+          <i class="fa fa-arrow-circle-up fa-2x"></i>
+        </button>
+        <button class="btn" id="move-down">
+          <i class="fa fa-arrow-circle-down fa-2x"></i>
+        </button>
+        <span id="cursor-coordination">(0,0)</span>
+      </div>
       <div class="controls">
         <button class="btn" id="play">
           <i class="fa fa-play fa-2x"></i>

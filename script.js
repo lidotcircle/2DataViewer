@@ -2,12 +2,55 @@ const play = document.getElementById('play');
 const stop = document.getElementById('stop');
 const progress = document.getElementById('progress');
 const timestamp = document.getElementById('timestamp');
+const fullviewport = document.getElementById('fullviewport');
+const screenviewport = document.getElementById('viewport');
+const reset = document.getElementById('reset');
+const scaleUp = document.getElementById('scale-up');
+const scaleDown = document.getElementById('scale-down');
+const moveLeft = document.getElementById('move-left');
+const moveRight = document.getElementById('move-right');
+const moveUp = document.getElementById('move-up');
+const moveDown = document.getElementById('move-down');
+const cursorCoordination = document.getElementById('cursor-coordination');
+
+
+class AffineTransformation {
+    constructor(a, b, c, d, tx, ty) {
+        this.a = a || 1;
+        this.b = b || 0;
+        this.c = c || 0;
+        this.d = d || 1;
+        this.tx = tx || 0;
+        this.ty = ty || 0;
+    }
+
+    static identity() { return new AffineTransformation(1, 0, 0, 1, 0, 0); }
+
+    concat(other) {
+        const a = this.a * other.a + this.b * other.c;
+        const b = this.a * other.b + this.b * other.d;
+        const c = this.c * other.a + this.d * other.c;
+        const d = this.c * other.b + this.d * other.d;
+        const tx = this.a * other.tx + this.b * other.ty + this.tx;
+        const ty = this.c * other.tx + this.d * other.ty + this.ty;
+
+        return new AffineTransformation(a, b, c, d, tx, ty);
+    }
+
+    applyXY(point) {
+        const x = this.a * point.x + this.b * point.y + this.tx;
+        const y = this.c * point.x + this.d * point.y + this.ty;
+        return { x, y };
+    }
+}
 
 class Viewport
 {
     constructor(canvasId)
     {
-        this.m_i2dlayer = i2d.canvasLayer(canvasId, {alpha: false}, {enableEvents: true});
+        this.m_viewportEl = document.getElementById(canvasId)
+        this.m_i2dlayer = i2d.canvasLayer('#' + canvasId, {alpha: false}, {enableEvents: true});
+		this.m_transform = AffineTransformation.identity();
         this.drawtest();
     }
 
@@ -182,6 +225,72 @@ class Viewport
     get totalFrames() { return this.m_totalFrames; }
     get currentFrame() { return this.m_currentFrame; }
 
+    setHTMLElementTransform() {
+        let trans = this.m_transform;
+        const transtext = `matrix(${trans.a}, ${trans.b}, ${trans.c}, ${trans.d}, ${trans.tx}, ${trans.ty})`;
+        this.m_viewportEl.style.transform = transtext;
+    }
+
+    reset()
+    {
+        this.m_transform = AffineTransformation.identity();
+        viewport.setHTMLElementTransform();
+    }
+    scaleUp(X, Y)
+    {
+        this.scale(1.1, 1.1, X, Y);
+        this.setHTMLElementTransform();
+    }
+    scaleDown(X, Y)
+    {
+        this.scale(1/1.1, 1/1.1, X, Y);
+        this.setHTMLElementTransform();
+    }
+    moveLeft()
+    {
+        this.translate(-50, 0);
+        this.setHTMLElementTransform(); 
+    }
+    moveRight()
+    {
+        this.translate(50, 0);
+        this.setHTMLElementTransform(); 
+    }
+    moveUp()
+    {
+        this.translate(0, -50);
+        this.setHTMLElementTransform(); 
+    }
+    moveDown()
+    {
+        this.translate(0, 50);
+        this.setHTMLElementTransform(); 
+    }
+
+    scale(scaleX, scaleY, _X, _Y)
+    {
+        const X = _X || 0
+        const Y = _X || 0
+        const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
+        const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
+        const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
+
+        const scaleAt = translation2.concat(scaling.concat(translation1));
+        this.m_transform = this.m_transform.concat(scaleAt);
+    }
+
+    translate(X, Y)
+	{
+        this.m_transform = this.m_transform.concat(new AffineTransformation(1, 0, 0, 1, X, Y));
+	}
+
+    rotate(clockDegree)
+    {
+        const c = Math.cos(clockDegree / 180 * Math.PI);
+        const s = Math.sin(clockDegree / 180 * Math.PI);
+        this.m_transform = this.m_transform.concat(new AffineTransformation(c, s, -s, c, 0, 0));
+    }
+
     play()
     {
         this.m_paused = false;
@@ -200,9 +309,11 @@ class Viewport
     m_paused = true;
     m_currentFrame = 0;
     m_totalFrames = 30;
-    m_i2dlayer = null;
+    m_transform;
+    m_i2dlayer;
+    m_viewportEl;
 }
-const viewport = new Viewport('#viewport');
+const viewport = new Viewport('viewport');
 
 // Play & pause player
 function toggleViewportStatus() {
@@ -254,5 +365,28 @@ play.addEventListener('click', toggleViewportStatus);
 stop.addEventListener('click', stopViewport);
 
 progress.addEventListener('change', setViewportProgress);
+
+reset.addEventListener('click', () => viewport.reset());
+scaleUp.addEventListener('click', () => viewport.scaleUp());
+scaleDown.addEventListener('click', () => viewport.scaleDown());
+moveLeft.addEventListener('click', () => viewport.moveLeft());
+moveRight.addEventListener('click', () => viewport.moveRight());
+moveUp.addEventListener('click', () => viewport.moveUp());
+moveDown.addEventListener('click', () => viewport.moveDown());
+
+fullviewport.addEventListener('wheel', (e) => {
+    console.log(e.clientX, e.clientY);
+    if (e.deltaY < 0) {
+        viewport.scaleUp();
+    } else if (e.deltaY > 0) {
+        viewport.scaleDown();
+    }
+});
+fullviewport.addEventListener('mousemove', (e) => {
+    console.log(e.clientX, e.clientY);
+});
+fullviewport.addEventListener('mousedown', (e) => {
+    console.log(e.which);
+});
 
 updateProgress()
