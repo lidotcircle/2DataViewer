@@ -44,6 +44,67 @@ class AffineTransformation {
     }
 }
 
+class BoundingBox {
+    constructor(point1, point2) {
+        // Determine the coordinates of the top-left corner (minX, minY)
+        // and the bottom-right corner (maxX, maxY)
+        this.minX = Math.min(point1.x, point2.x);
+        this.minY = Math.min(point1.y, point2.y);
+        this.maxX = Math.max(point1.x, point2.x);
+        this.maxY = Math.max(point1.y, point2.y);
+    }
+
+    // Method to merge another point into the bounding box and return a new bounding box
+    merge(point) {
+        // Calculate new bounding box coordinates
+        const minX = Math.min(this.minX, point.x);
+        const minY = Math.min(this.minY, point.y);
+        const maxX = Math.max(this.maxX, point.x);
+        const maxY = Math.max(this.maxY, point.y);
+
+        // Return a new BoundingBox object with the updated coordinates
+        return new BoundingBox({ x: minX, y: minY }, { x: maxX, y: maxY });
+    }
+
+    move(vec) {
+        return new BoundingBox({ x: minX + vec.x, y: minY + vec.y }, { x: maxX + vec.x, y: maxY + vec.y });
+    }
+
+    // Method to check if a point is inside the bounding box
+    containsPoint(point) {
+        return point.x >= this.minX && point.x <= this.maxX &&
+            point.y >= this.minY && point.y <= this.maxY;
+    }
+
+    // Method to get the width of the bounding box
+    getWidth() {
+        return this.maxX - this.minX;
+    }
+
+    // Method to get the height of the bounding box
+    getHeight() {
+        return this.maxY - this.minY;
+    }
+
+    // Method to get the area of the bounding box
+    getArea() {
+        return this.getWidth() * this.getHeight();
+    }
+
+    getBL() { return {x: minX, y: minY}; }
+
+    getTR() { return {x: maxX, y: maxY}; }
+}
+
+class DrawItem {
+    static CreateCircle(center, radius) {}
+    static CreateLine(ptA, ptB, width) {}
+    static CreateCLine(ptA, ptB, width) {}
+    static CreatePolygon(pts) {}
+
+    m_type;
+}
+
 class Viewport
 {
     constructor(canvasId)
@@ -51,7 +112,14 @@ class Viewport
         this.m_viewportEl = document.getElementById(canvasId)
         this.m_i2dlayer = i2d.canvasLayer('#' + canvasId, {alpha: false}, {enableEvents: true});
 		this.m_transform = AffineTransformation.identity();
+        window.addEventListener("resize", () => this.refresh());
+        this.refresh();
         this.drawtest();
+    }
+
+    refresh()
+    {
+        this.m_i2dlayer.setSize(this.m_viewportEl.clientWidth * 2, this.m_viewportEl.clientHeight * 2);
     }
 
     drawtest()
@@ -312,6 +380,7 @@ class Viewport
     m_transform;
     m_i2dlayer;
     m_viewportEl;
+    m_objectList;
 }
 const viewport = new Viewport('viewport');
 
@@ -389,4 +458,4 @@ fullviewport.addEventListener('mousedown', (e) => {
     console.log(e.which);
 });
 
-updateProgress()
+updateProgress();
