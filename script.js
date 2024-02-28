@@ -247,7 +247,7 @@ class Viewport
             } else if (item.type == "circle") {
                 ctx.fillStyle = item.m_style.fillStyle || "white";
                 const path = new Path2D();
-                path.ellipse(item.m_circleData.m_center.x, item.m_circleData.m_center.x, item.m_circleData.m_radius,
+                path.ellipse(item.m_circleData.m_center.x, item.m_circleData.m_center.y, item.m_circleData.m_radius,
                              item.m_circleData.m_radius, 0, 0, 360);;
                 ctx.fill(path);
             } else if (item.type == "cline") {
