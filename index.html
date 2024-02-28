@@ -12,7 +12,9 @@
   <body>
     <div class="container">
       <div class="title"><h1>2D Data Viewer</h1></div>
-      <div class="screen" id="fullviewport"><div id="viewport"></div></div>
+      <div class="screen" id="fullviewport"><div id="viewport">
+          <canvas width="300" height="300"></canvas>
+      </div></div>
       <div class="tools">
         <button class="btn" id="reset">
           <i class="fa fa-refresh fa-2x"></i>
@@ -35,7 +37,7 @@
         <button class="btn" id="move-down">
           <i class="fa fa-arrow-circle-down fa-2x"></i>
         </button>
-        <span id="cursor-coordination">(0,0)</span>
+        <span class="coordx"><span id="cursor-coordination">(0,0)</span></span>
       </div>
       <div class="controls">
         <button class="btn" id="play">

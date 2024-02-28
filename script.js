@@ -42,6 +42,26 @@ class AffineTransformation {
         const y = this.c * point.x + this.d * point.y + this.ty;
         return { x, y };
     }
+
+    revertXY(point) {
+        const determinant = this.a * this.d - this.b * this.c;
+        if (determinant === 0) {
+            throw new Error("Transformation is not invertible.");
+        }
+
+        const invDet = 1 / determinant;
+        const newA = this.d * invDet;
+        const newB = -this.b * invDet;
+        const newC = -this.c * invDet;
+        const newD = this.a * invDet;
+        const newTx = (this.c * this.ty - this.d * this.tx) * invDet;
+        const newTy = (this.b * this.tx - this.a * this.ty) * invDet;
+
+        const x = newA * point.x + newB * point.y + newTx;
+        const y = newC * point.x + newD * point.y + newTy;
+
+        return { x, y };
+    }
 }
 
 class BoundingBox {
@@ -96,13 +116,79 @@ class BoundingBox {
     getTR() { return {x: maxX, y: maxY}; }
 }
 
+class CircleData {
+    m_center;
+    m_radius;
+}
+class LineData {
+    m_p1;
+    m_p2;
+    m_width;
+}
+class CLineData {
+    m_p1;
+    m_p2;
+    m_width;
+}
+class PolygonData {
+    m_pts;
+}
+
 class DrawItem {
-    static CreateCircle(center, radius) {}
-    static CreateLine(ptA, ptB, width) {}
-    static CreateCLine(ptA, ptB, width) {}
-    static CreatePolygon(pts) {}
+    static CreateCircle(center, radius) {
+        let ans = new DrawItem("circle");
+        ans.m_circleData = new CircleData();
+        ans.m_circleData.m_center = center;
+        ans.m_circleData.m_radius = radius;
+        return ans;
+    }
+    static CreateLine(ptA, ptB, width) {
+        let ans = new DrawItem("line");
+        ans.m_lineData = new LineData();
+        ans.m_lineData.m_p1 = ptA;
+        ans.m_lineData.m_p2 = ptB;
+        ans.m_lineData.m_width = width;
+        return ans;
+    }
+    static CreateCLine(ptA, ptB, width) {
+        let ans = new DrawItem("cline");
+        ans.m_clineData = new CLineData();
+        ans.m_clineData.m_p1 = ptA;
+        ans.m_clineData.m_p2 = ptB;
+        ans.m_clineData.m_width = width;
+        return ans;
+    }
+    static CreatePolygon(pts) {
+        let ans = new DrawItem("polygon");
+        ans.m_polygonData = new PolygonData();
+        ans.m_polygonData.m_pts = pts;
+        return ans;
+    }
+
+    constructor(type) {
+        this.m_type = type;
+        this.m_style = {
+            fillStyle: "white",
+            strokeStyle: "white",
+        };
+    }
+
+    setStyle(newStyle) {
+        if (newStyle == null) {
+            this.m_style = {};
+        } else {
+            this.m_style = newStyle;
+        }
+    } 
+
+    get type() { return this.m_type; }
 
     m_type;
+    m_style;
+    m_circleData;
+    m_lineData;
+    m_clineData;
+    m_polygonData;
 }
 
 class Viewport
@@ -110,229 +196,159 @@ class Viewport
     constructor(canvasId)
     {
         this.m_viewportEl = document.getElementById(canvasId)
-        this.m_i2dlayer = i2d.canvasLayer('#' + canvasId, {alpha: false}, {enableEvents: true});
+        this.m_canvas = this.m_viewportEl.querySelector("canvas");
 		this.m_transform = AffineTransformation.identity();
+        this.m_objectList = [];
         window.addEventListener("resize", () => this.refresh());
         this.refresh();
         this.drawtest();
     }
 
+    DrawCircle(center, radius, style) {
+        let circle = DrawItem.CreateCircle(center, radius);
+        circle.setStyle(style);
+        this.m_objectList.push(circle);
+    }
+
+    DrawLine(start, end, width, style) {
+        let line = DrawItem.CreateLine(start, end, width);
+        line.setStyle(style);
+        this.m_objectList.push(line);
+    }
+
+    DrawCLine(start, end, width, style) {
+        let cline = DrawItem.CreateCLine(start, end, width);
+        cline.setStyle(style);
+        this.m_objectList.push(cline);
+    }
+
+    DrawPolygon(pts, style) {
+        let polygon = DrawItem.CreatePolygon(pts);
+        polygon.setStyle(style);
+        this.m_objectList.push(polygon);
+    }
+
+    refreshCanvas() {
+        let ctx = this.m_canvas.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.m_canvas.width, this.m_canvas.height);
+
+        const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
+        const t = baseTrans.concat(this.m_transform);
+        ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
+        for (let item of this.m_objectList) {
+            if (item.type == "line") {
+                ctx.strokeStyle = item.m_style.strokeStyle || "white";
+                ctx.lineWidth = item.m_lineData.m_width;
+                const path = new Path2D();
+                path.lineTo(item.m_lineData.m_p1.x, item.m_lineData.m_p1.y);
+                path.lineTo(item.m_lineData.m_p2.x, item.m_lineData.m_p2.y);
+                ctx.stroke(path);
+            } else if (item.type == "circle") {
+                ctx.fillStyle = item.m_style.fillStyle || "white";
+                const path = new Path2D();
+                path.ellipse(item.m_circleData.m_center.x, item.m_circleData.m_center.x, item.m_circleData.m_radius,
+                             item.m_circleData.m_radius, 0, 0, 360);;
+                ctx.fill(path);
+            } else if (item.type == "cline") {
+                ctx.strokeStyle = item.m_style.strokeStyle || "white";
+                ctx.lineWidth = item.m_clineData.m_width;
+                {
+                    const path = new Path2D();
+                    path.lineTo(item.m_clineData.m_p1.x, item.m_clineData.m_p1.y);
+                    path.lineTo(item.m_clineData.m_p2.x, item.m_clineData.m_p2.y);
+                    ctx.stroke(path);
+                }
+                {
+                    ctx.fillStyle = item.m_style.strokeStyle || "white";
+                    const path = new Path2D();
+                    path.ellipse(item.m_clineData.m_p1.x, item.m_clineData.m_p1.y, item.m_clineData.m_width / 2,
+                        item.m_clineData.m_width / 2, 0, 0, 360);;
+                    ctx.fill(path);
+                }
+                {
+                    ctx.fillStyle = item.m_style.strokeStyle || "white";
+                    const path = new Path2D();
+                    path.ellipse(item.m_clineData.m_p2.x, item.m_clineData.m_p2.y, item.m_clineData.m_width / 2,
+                        item.m_clineData.m_width / 2, 0, 0, 360);;
+                    ctx.fill(path);
+                }
+            } else if (item.type == "polygon") {
+                ctx.fillStyle = item.m_style.fillStyle || "white";
+                {
+                    const path = new Path2D();
+                    for (let p of item.m_polygonData.m_pts) {
+                        path.lineTo(p.x, p.y);
+                    }
+                    path.closePath();
+                    ctx.fill(path);
+                }
+            }
+        }
+    }
+
     refresh()
     {
-        this.m_i2dlayer.setSize(this.m_viewportEl.clientWidth * 2, this.m_viewportEl.clientHeight * 2);
+        this.m_canvas.width = this.m_viewportEl.clientWidth;
+        this.m_canvas.height = this.m_viewportEl.clientHeight;
+        this.refreshCanvas();
     }
 
     drawtest()
     {
-        let renderer = this.m_i2dlayer;
-        var rect = renderer
-            .createEl({
-                el: "rect",
-                attr: {
-                    x: 50,
-                    y: 100,
-                    width: 100,
-                    height: 100,
-                },
-                style: {
-                    fillStyle: "red",
-                    shadowColor: "#999",
-                    shadowBlur: 20,
-                    shadowOffsetX: 15,
-                    shadowOffsetY: 15,
-                },
-            })
-            .on("mouseover", function () {
-                this.setStyle("fillStyle", "green");
-            })
-            .on("mouseout", function () {
-                this.setStyle("fillStyle", "red");
-            });
-
-        var polygon = renderer.createEl({
-            el: "polygon",
-            attr: {
-                points: [
-                    { x: 100, y: 10 },
-                    { x: 40, y: 198 },
-                    { x: 190, y: 78 },
-                    { x: 10, y: 78 },
-                    { x: 160, y: 198 },
-                ],
-                transform: {
-                    translate: [200, 50],
-                },
-            },
-            style: {
-                // lineWidth:4,
-                fillStyle: "lime",
-                // strokeStyle:'purple',
-                shadowColor: "#999",
-                shadowBlur: 20,
-                shadowOffsetX: 15,
-                shadowOffsetY: 15,
-            },
-        });
-
-        var circle = renderer.createEl({
-            el: "circle",
-            attr: {
-                r: 70,
-                cx: 0,
-                cy: 0,
-                transform: {
-                    translate: [500, 150],
-                },
-            },
-            style: {
-                lineWidth: 4,
-                strokeStyle: "red",
-                shadowColor: "#999",
-                shadowBlur: 20,
-                shadowOffsetX: 15,
-                shadowOffsetY: 15,
-            },
-        });
-
-        var circle = renderer.createEl({
-            el: "line",
-            attr: {
-                x1: 0,
-                x2: 100,
-                y1: 0,
-                y2: 100,
-                transform: {
-                    translate: [650, 100],
-                },
-            },
-            style: {
-                lineWidth: 4,
-                strokeStyle: "red",
-                shadowColor: "#999",
-                shadowBlur: 20,
-                shadowOffsetX: 15,
-                shadowOffsetY: 15,
-            },
-        });
-
-        var ellipse = renderer.createEl({
-            el: "ellipse",
-            attr: {
-                cx: 100,
-                cy: 0,
-                rx: 120,
-                ry: 50,
-                transform: {
-                    translate: [800, 150],
-                },
-            },
-            style: {
-                // lineWidth:4,
-                fillStyle: "lime",
-                // strokeStyle:'purple',
-                shadowColor: "#999",
-                shadowBlur: 20,
-                shadowOffsetX: 15,
-                shadowOffsetY: 15,
-            },
-        });
-
-        var rect2 = renderer
-            .createEl({
-                el: "rect",
-                attr: {
-                    x: 500,
-                    y: 350,
-                    width: 150,
-                    height: 150,
-                    rx: 25,
-                    ry: 25,
-                },
-                style: {
-                    fillStyle: "red",
-                    shadowColor: "#999",
-                    shadowBlur: 20,
-                    shadowOffsetX: 15,
-                    shadowOffsetY: 15,
-                },
-            })
-            .on("mouseover", function () {
-                this.setStyle("fillStyle", "green");
-            })
-            .on("mouseout", function () {
-                this.setStyle("fillStyle", "red");
-            });
-
-        renderer
-            .createEl({
-                el: "polyline",
-                attr: {
-                    points: [
-                        { x: 100, y: 10 },
-                        { x: 150, y: 100 },
-                        { x: 250, y: 0 },
-                    ],
-                    transform: {
-                        translate: [50, 400],
-                    },
-                },
-                style: {
-                    strokeStyle: "red",
-                    lineWidth: 4,
-                },
-            })
-            .on("mouseover", function () {
-                this.setStyle("strokeStyle", "green");
-            })
-            .on("mouseout", function () {
-                this.setStyle("strokeStyle", "red");
-            });
+        this.DrawCircle({x: 0, y: 0}, 100);
+        this.DrawCircle({x: 8000, y: 4000}, 100);
+        this.DrawLine({x: 200, y: 0}, {x: 100, y: 0}, 10);
+        this.DrawCLine({x: 200, y: 200}, {x: 100, y: 200}, 10);
+        this.DrawPolygon([{x: 100, y: 100}, {x: 300, y: 300}, {x: 200, y: 300}]);
+        this.refreshCanvas();
     }
 
     get paused() { return this.m_paused; }
     get totalFrames() { return this.m_totalFrames; }
     get currentFrame() { return this.m_currentFrame; }
 
-    setHTMLElementTransform() {
-        let trans = this.m_transform;
-        const transtext = `matrix(${trans.a}, ${trans.b}, ${trans.c}, ${trans.d}, ${trans.tx}, ${trans.ty})`;
-        this.m_viewportEl.style.transform = transtext;
+    canvasCoordToReal(point) {
+        const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
+        const t = baseTrans.concat(this.m_transform);
+        const ans = t.revertXY(point);
+        return {x: Math.round(ans.x), y: Math.round(ans.y)};
     }
 
     reset()
     {
         this.m_transform = AffineTransformation.identity();
-        viewport.setHTMLElementTransform();
+        viewport.refreshCanvas();
     }
     scaleUp(X, Y)
     {
         this.scale(1.1, 1.1, X, Y);
-        this.setHTMLElementTransform();
+        this.refreshCanvas();
     }
     scaleDown(X, Y)
     {
         this.scale(1/1.1, 1/1.1, X, Y);
-        this.setHTMLElementTransform();
+        this.refreshCanvas();
     }
     moveLeft()
     {
         this.translate(-50, 0);
-        this.setHTMLElementTransform(); 
+        this.refreshCanvas(); 
     }
     moveRight()
     {
         this.translate(50, 0);
-        this.setHTMLElementTransform(); 
+        this.refreshCanvas(); 
     }
     moveUp()
     {
         this.translate(0, -50);
-        this.setHTMLElementTransform(); 
+        this.refreshCanvas(); 
     }
     moveDown()
     {
         this.translate(0, 50);
-        this.setHTMLElementTransform(); 
+        this.refreshCanvas(); 
     }
 
     scale(scaleX, scaleY, _X, _Y)
@@ -378,7 +394,6 @@ class Viewport
     m_currentFrame = 0;
     m_totalFrames = 30;
     m_transform;
-    m_i2dlayer;
     m_viewportEl;
     m_objectList;
 }
@@ -444,18 +459,18 @@ moveUp.addEventListener('click', () => viewport.moveUp());
 moveDown.addEventListener('click', () => viewport.moveDown());
 
 fullviewport.addEventListener('wheel', (e) => {
-    console.log(e.clientX, e.clientY);
+    const pt = viewport.canvasCoordToReal({x: e.clientX, y: e.clientY});
     if (e.deltaY < 0) {
-        viewport.scaleUp();
+        viewport.scaleUp(pt.x, pt.y);
     } else if (e.deltaY > 0) {
-        viewport.scaleDown();
+        viewport.scaleDown(pt.x, pt.y);
     }
 });
 fullviewport.addEventListener('mousemove', (e) => {
-    console.log(e.clientX, e.clientY);
+    const pt = viewport.canvasCoordToReal({x: e.clientX, y: e.clientY});
+    cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
 });
 fullviewport.addEventListener('mousedown', (e) => {
-    console.log(e.which);
 });
 
 updateProgress();
