@@ -459,7 +459,7 @@ moveUp.addEventListener('click', () => viewport.moveUp());
 moveDown.addEventListener('click', () => viewport.moveDown());
 
 fullviewport.addEventListener('wheel', (e) => {
-    const pt = viewport.canvasCoordToReal({x: e.clientX, y: e.clientY});
+    const pt = viewport.canvasCoordToReal({x: e.offsetX, y: e.offsetY});
     if (e.deltaY < 0) {
         viewport.scaleUp(pt.x, pt.y);
     } else if (e.deltaY > 0) {
@@ -467,7 +467,7 @@ fullviewport.addEventListener('wheel', (e) => {
     }
 });
 fullviewport.addEventListener('mousemove', (e) => {
-    const pt = viewport.canvasCoordToReal({x: e.clientX, y: e.clientY});
+    const pt = viewport.canvasCoordToReal({x: e.offsetX, y: e.offsetY});
     cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
 });
 fullviewport.addEventListener('mousedown', (e) => {
