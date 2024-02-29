@@ -354,13 +354,14 @@ class Viewport
     scale(scaleX, scaleY, _X, _Y)
     {
         const X = _X || 0
-        const Y = _X || 0
-        const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
+        const Y = _Y || 0
+        const xy = this.m_transform.applyXY({x: X, y: Y});
+        const translation1 = new AffineTransformation(1, 0, 0, 1, -xy.x, -xy.y);
         const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
-        const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
+        const translation2 = new AffineTransformation(1, 0, 0, 1, xy.x, xy.y);
 
         const scaleAt = translation2.concat(scaling.concat(translation1));
-        this.m_transform = this.m_transform.concat(scaleAt);
+        this.m_transform = scaleAt.concat(this.m_transform);
     }
 
     translate(X, Y)
@@ -474,3 +475,4 @@ fullviewport.addEventListener('mousedown', (e) => {
 });
 
 updateProgress();
+
