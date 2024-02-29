@@ -55,6 +55,10 @@ body {
     overflow: hidden;
 }
 
+.screen.drag-mode {
+    cursor: grabbing;
+}
+    
 #viewport {
     width: 100%;
     height: 100%;

@@ -111,9 +111,23 @@ class BoundingBox {
         return this.getWidth() * this.getHeight();
     }
 
-    getBL() { return {x: minX, y: minY}; }
+    getCenter() {
+        return {x: (this.getBL().x + this.getTR().x) / 2, y: (this.getBL().y + this.getTR().y) / 2};
+    }
 
-    getTR() { return {x: maxX, y: maxY}; }
+    getBL() { return {x: this.minX, y: this.minY}; }
+
+    getTR() { return {x: this.maxX, y: this.maxY}; }
+}
+
+function Box2boxTransformation(box1, box2)
+{
+    const s = Math.min(box2.getHeight() / box1.getHeight(), box2.getWidth() / box1.getWidth());
+    const c1 = box1.getCenter();
+    const c2 = box2.getCenter();
+    return new AffineTransformation(1, 0, 0, 1, c2.x, c2.y)
+        .concat(new AffineTransformation(s * 0.8, 0, 0, s * 0.8, 0, 0))
+        .concat(new AffineTransformation(1, 0, 0, 1, -c1.x, -c1.y));
 }
 
 class CircleData {
@@ -168,8 +182,8 @@ class DrawItem {
     constructor(type) {
         this.m_type = type;
         this.m_style = {
-            fillStyle: "white",
-            strokeStyle: "white",
+            fillStyle: this.m_defaultColor,
+            strokeStyle: this.m_defaultColor,
         };
     }
 
@@ -201,7 +215,6 @@ class Viewport
         this.m_objectList = [];
         window.addEventListener("resize", () => this.refresh());
         this.refresh();
-        this.drawtest();
     }
 
     DrawCircle(center, radius, style) {
@@ -238,20 +251,20 @@ class Viewport
         ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
         for (let item of this.m_objectList) {
             if (item.type == "line") {
-                ctx.strokeStyle = item.m_style.strokeStyle || "white";
+                ctx.strokeStyle = item.m_style.strokeStyle || this.m_defaultColor;
                 ctx.lineWidth = item.m_lineData.m_width;
                 const path = new Path2D();
                 path.lineTo(item.m_lineData.m_p1.x, item.m_lineData.m_p1.y);
                 path.lineTo(item.m_lineData.m_p2.x, item.m_lineData.m_p2.y);
                 ctx.stroke(path);
             } else if (item.type == "circle") {
-                ctx.fillStyle = item.m_style.fillStyle || "white";
+                ctx.fillStyle = item.m_style.fillStyle || this.m_defaultColor;
                 const path = new Path2D();
                 path.ellipse(item.m_circleData.m_center.x, item.m_circleData.m_center.y, item.m_circleData.m_radius,
                              item.m_circleData.m_radius, 0, 0, 360);;
                 ctx.fill(path);
             } else if (item.type == "cline") {
-                ctx.strokeStyle = item.m_style.strokeStyle || "white";
+                ctx.strokeStyle = item.m_style.strokeStyle || this.m_defaultColor;
                 ctx.lineWidth = item.m_clineData.m_width;
                 {
                     const path = new Path2D();
@@ -260,21 +273,21 @@ class Viewport
                     ctx.stroke(path);
                 }
                 {
-                    ctx.fillStyle = item.m_style.strokeStyle || "white";
+                    ctx.fillStyle = item.m_style.strokeStyle || this.m_defaultColor;
                     const path = new Path2D();
                     path.ellipse(item.m_clineData.m_p1.x, item.m_clineData.m_p1.y, item.m_clineData.m_width / 2,
                         item.m_clineData.m_width / 2, 0, 0, 360);;
                     ctx.fill(path);
                 }
                 {
-                    ctx.fillStyle = item.m_style.strokeStyle || "white";
+                    ctx.fillStyle = item.m_style.strokeStyle || this.m_defaultColor;
                     const path = new Path2D();
                     path.ellipse(item.m_clineData.m_p2.x, item.m_clineData.m_p2.y, item.m_clineData.m_width / 2,
                         item.m_clineData.m_width / 2, 0, 0, 360);;
                     ctx.fill(path);
                 }
             } else if (item.type == "polygon") {
-                ctx.fillStyle = item.m_style.fillStyle || "white";
+                ctx.fillStyle = item.m_style.fillStyle || this.m_defaultColor;
                 {
                     const path = new Path2D();
                     for (let p of item.m_polygonData.m_pts) {
@@ -291,16 +304,6 @@ class Viewport
     {
         this.m_canvas.width = this.m_viewportEl.clientWidth;
         this.m_canvas.height = this.m_viewportEl.clientHeight;
-        this.refreshCanvas();
-    }
-
-    drawtest()
-    {
-        this.DrawCircle({x: 0, y: 0}, 100);
-        this.DrawCircle({x: 8000, y: 4000}, 100);
-        this.DrawLine({x: 200, y: 0}, {x: 100, y: 0}, 10);
-        this.DrawCLine({x: 200, y: 200}, {x: 100, y: 200}, 10);
-        this.DrawPolygon([{x: 100, y: 100}, {x: 300, y: 300}, {x: 200, y: 300}]);
         this.refreshCanvas();
     }
 
@@ -342,12 +345,12 @@ class Viewport
     }
     moveUp()
     {
-        this.translate(0, -50);
+        this.translate(0, 50);
         this.refreshCanvas(); 
     }
     moveDown()
     {
-        this.translate(0, 50);
+        this.translate(0, -50);
         this.refreshCanvas(); 
     }
 
@@ -366,7 +369,9 @@ class Viewport
 
     translate(X, Y)
 	{
-        this.m_transform = this.m_transform.concat(new AffineTransformation(1, 0, 0, 1, X, Y));
+        const v1 = this.m_transform.revertXY({x: X, y: Y});
+        const v2 = this.m_transform.revertXY({x: 0, y: 0});
+        this.m_transform = this.m_transform.concat(new AffineTransformation(1, 0, 0, 1, v1.x - v2.x, v1.y - v2.y));
 	}
 
     rotate(clockDegree)
@@ -386,14 +391,43 @@ class Viewport
         this.m_paused = true;
     }
 
-    setFrame(n)
+    async setFrame(n)
     {
+        if (n > this.m_totalFrames - 1) return;
         this.m_currentFrame = Math.max(Math.min(n, this.m_totalFrames - 1), 0);
+        const text = await this.m_loader(this.m_currentFrame);
+        this.m_objectList = [];
+        const objlist = JSON.parse(text);
+        for (let obj of objlist) {
+            const drawItem = new DrawItem(obj.m_type)
+            Object.assign(drawItem, obj);
+            this.m_objectList.push(drawItem);
+        }
+        this.refreshCanvas();
+    }
+
+    init(minXY, maxXY, totalFrames, loader)
+    {
+        this.m_currentFrame = 0;
+        this.m_totalFrames = totalFrames;
+        const box = new BoundingBox(minXY, maxXY);
+        const boxviewport = new BoundingBox({
+            x: -this.m_canvas.width / 2,
+            y: -this.m_canvas.height/2
+        }, {
+            x: this.m_canvas.width / 2,
+            y: this.m_canvas.height/2
+        });
+        this.m_transform = Box2boxTransformation(box, boxviewport);
+        this.m_loader = loader;
+        this.setFrame(0);
     }
 
     m_paused = true;
     m_currentFrame = 0;
     m_totalFrames = 30;
+    m_loader;
+    m_defaultColor = "white";
     m_transform;
     m_viewportEl;
     m_objectList;
@@ -467,12 +501,158 @@ fullviewport.addEventListener('wheel', (e) => {
         viewport.scaleDown(pt.x, pt.y);
     }
 });
+
+let isInDragMode = false;
+let dragModePrevPt = {};
+function enterDragMode(pt)
+{
+    isInDragMode = true;
+    dragModePrevPt = pt
+    fullviewport.classList.add("drag-mode");
+}
+function leaveDragMode()
+{
+    isInDragMode = false;
+    fullviewport.classList.remove("drag-mode");
+}
+
 fullviewport.addEventListener('mousemove', (e) => {
-    const pt = viewport.canvasCoordToReal({x: e.offsetX, y: e.offsetY});
-    cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
+    if (isInDragMode) {
+        viewport.translate(e.offsetX - dragModePrevPt.x, dragModePrevPt.y - e.offsetY);
+        viewport.refreshCanvas();
+        dragModePrevPt = {x: e.offsetX, y: e.offsetY};
+    } else {
+        const pt = viewport.canvasCoordToReal({x: e.offsetX, y: e.offsetY});
+        cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
+    }
 });
 fullviewport.addEventListener('mousedown', (e) => {
+    if ((e.buttons & 4) != 0) {
+        enterDragMode({x: e.offsetX, y: e.offsetY});
+    }
+});
+fullviewport.addEventListener('mouseleave', (e) => {
+    leaveDragMode();
+});
+fullviewport.addEventListener('mouseup', (e) => {
+    if ((e.buttons & 4) == 0) {
+        leaveDragMode();
+    }
+});
+fullviewport.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
 });
 
+
+const baseFrame = [
+  {
+    "m_type": "circle",
+    "m_style": {},
+    "m_circleData": {
+      "m_center": {
+        "x": 0,
+        "y": 0
+      },
+      "m_radius": 100
+    }
+  },
+  {
+    "m_type": "circle",
+    "m_style": {},
+    "m_circleData": {
+      "m_center": {
+        "x": 800,
+        "y": 400
+      },
+      "m_radius": 100
+    }
+  },
+  {
+    "m_type": "line",
+    "m_style": {},
+    "m_lineData": {
+      "m_p1": {
+        "x": 200,
+        "y": 0
+      },
+      "m_p2": {
+        "x": 100,
+        "y": 0
+      },
+      "m_width": 10
+    }
+  },
+  {
+    "m_type": "cline",
+    "m_style": {},
+    "m_clineData": {
+      "m_p1": {
+        "x": 200,
+        "y": 200
+      },
+      "m_p2": {
+        "x": 100,
+        "y": 200
+      },
+      "m_width": 10
+    }
+  },
+  {
+    "m_type": "polygon",
+    "m_style": {},
+    "m_polygonData": {
+      "m_pts": [
+        {
+          "x": 100,
+          "y": 100
+        },
+        {
+          "x": 300,
+          "y": 300
+        },
+        {
+          "x": 200,
+          "y": 300
+        }
+      ]
+    }
+  }
+];
+
+function iteratePoints(object, func)
+{
+    for (let key in object) {
+        if (object.hasOwnProperty(key)) {
+            if (typeof object[key] == 'object') {
+                if ('x' in object[key] && 'y' in object[key]) {
+                    func(object[key]);
+                } else {
+                    iteratePoints(object[key], func);
+                }
+            }
+        }
+    }
+}
+
+let minPt = {}, maxPt = {};
+iteratePoints(baseFrame, (pt) => {
+    minPt.x = minPt.x ? Math.min(minPt.x, pt.x) : pt.x;
+    minPt.y = minPt.y ? Math.min(minPt.y, pt.y) : pt.y;
+    maxPt.x = maxPt.x ? Math.max(maxPt.x, pt.x) : pt.x;
+    maxPt.y = maxPt.y ? Math.max(maxPt.y, pt.y) : pt.y;
+});
+
+viewport.init(minPt, maxPt, 1000, async (n) => {
+    const obj = JSON.parse(JSON.stringify(baseFrame));
+    iteratePoints(obj, (pt) => {
+        pt.x += n * 10;
+    });
+    return JSON.stringify(obj);
+});
 updateProgress();
 
+setInterval(() => {
+    viewport.setFrame(viewport.currentFrame+1);
+    updateProgress();
+}, 1000)
