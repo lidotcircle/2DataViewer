@@ -210,11 +210,12 @@ class Viewport
     constructor(canvasId)
     {
         this.m_viewportEl = document.getElementById(canvasId)
-        this.m_canvas = this.m_viewportEl.querySelector("canvas");
+        this.m_canvas = this.m_viewportEl.querySelector("canvas.drawing");
+        this.m_selectionBox = this.m_viewportEl.querySelector("canvas.selection");
 		this.m_transform = AffineTransformation.identity();
         this.m_objectList = [];
-        window.addEventListener("resize", () => this.refresh());
-        this.refresh();
+        window.addEventListener("resize", () => this.fitCanvas());
+        this.fitCanvas();
     }
 
     DrawCircle(center, radius, style) {
@@ -241,7 +242,7 @@ class Viewport
         this.m_objectList.push(polygon);
     }
 
-    refreshCanvas() {
+    refreshDrawingCanvas() {
         let ctx = this.m_canvas.getContext("2d");
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.m_canvas.width, this.m_canvas.height);
@@ -300,11 +301,39 @@ class Viewport
         }
     }
 
-    refresh()
+    drawSelection(start, to) {
+        let ctx = this.m_selectionBox.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.m_selectionBox.width, this.m_selectionBox.height);
+        ctx.fillStyle = "rgba(93, 93, 255, 0.3)";
+        const width = Math.abs(to.x - start.x);
+        const height = Math.abs(to.y - start.y);
+        ctx.fillRect(Math.min(start.x, to.x), Math.min(start.y, to.y), width, height);
+
+        ctx.strokeStyle = "rgba(80, 80, 255, 0.8)";
+        ctx.lineWidth = 2;
+        const path = new Path2D();
+        path.lineTo(start.x, start.y);
+        path.lineTo(start.x, to.y);
+        path.lineTo(to.x, to.y);
+        path.lineTo(to.x, start.y);
+        path.closePath();
+        ctx.stroke(path);
+    }
+
+    clearSelection() {
+        let ctx = this.m_selectionBox.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.m_selectionBox.width, this.m_selectionBox.height);
+    }
+
+    fitCanvas()
     {
         this.m_canvas.width = this.m_viewportEl.clientWidth;
         this.m_canvas.height = this.m_viewportEl.clientHeight;
-        this.refreshCanvas();
+        this.m_selectionBox.width = this.m_viewportEl.clientWidth;
+        this.m_selectionBox.height = this.m_viewportEl.clientHeight;
+        this.refreshDrawingCanvas();
     }
 
     get paused() { return this.m_paused; }
@@ -321,37 +350,37 @@ class Viewport
     reset()
     {
         this.m_transform = AffineTransformation.identity();
-        viewport.refreshCanvas();
+        viewport.refreshDrawingCanvas();
     }
     scaleUp(X, Y)
     {
         this.scale(1.1, 1.1, X, Y);
-        this.refreshCanvas();
+        this.refreshDrawingCanvas();
     }
     scaleDown(X, Y)
     {
         this.scale(1/1.1, 1/1.1, X, Y);
-        this.refreshCanvas();
+        this.refreshDrawingCanvas();
     }
     moveLeft()
     {
         this.translate(-50, 0);
-        this.refreshCanvas(); 
+        this.refreshDrawingCanvas(); 
     }
     moveRight()
     {
         this.translate(50, 0);
-        this.refreshCanvas(); 
+        this.refreshDrawingCanvas(); 
     }
     moveUp()
     {
         this.translate(0, 50);
-        this.refreshCanvas(); 
+        this.refreshDrawingCanvas(); 
     }
     moveDown()
     {
         this.translate(0, -50);
-        this.refreshCanvas(); 
+        this.refreshDrawingCanvas(); 
     }
 
     scale(scaleX, scaleY, _X, _Y)
@@ -403,7 +432,7 @@ class Viewport
             Object.assign(drawItem, obj);
             this.m_objectList.push(drawItem);
         }
-        this.refreshCanvas();
+        this.refreshDrawingCanvas();
     }
 
     init(minXY, maxXY, totalFrames, loader)
@@ -474,8 +503,10 @@ function setViewportProgress() {
 
 // Stop player
 function stopViewport() {
+    viewport.setFrame(0);
     viewport.pause();
     updatePlayIcon();
+    updateProgress();
 }
 
 
@@ -504,6 +535,8 @@ fullviewport.addEventListener('wheel', (e) => {
 
 let isInDragMode = false;
 let dragModePrevPt = {};
+let isInSelectionMode = false;
+let selectionStart = {};
 function enterDragMode(pt)
 {
     isInDragMode = true;
@@ -515,28 +548,51 @@ function leaveDragMode()
     isInDragMode = false;
     fullviewport.classList.remove("drag-mode");
 }
+function enterSelectionMode(pt)
+{
+    isInSelectionMode = true;
+    selectionStart = pt
+    fullviewport.classList.add("selection-mode");
+}
+function leaveSelectionMode()
+{
+    isInSelectionMode = false;
+    fullviewport.classList.remove("selection-mode");
+    viewport.clearSelection();
+}
 
 fullviewport.addEventListener('mousemove', (e) => {
     if (isInDragMode) {
         viewport.translate(e.offsetX - dragModePrevPt.x, dragModePrevPt.y - e.offsetY);
-        viewport.refreshCanvas();
+        viewport.refreshDrawingCanvas();
         dragModePrevPt = {x: e.offsetX, y: e.offsetY};
     } else {
         const pt = viewport.canvasCoordToReal({x: e.offsetX, y: e.offsetY});
         cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
+
+        if (isInSelectionMode) {
+            viewport.drawSelection(selectionStart, {x: e.offsetX, y: e.offsetY});
+        }
     }
 });
 fullviewport.addEventListener('mousedown', (e) => {
     if ((e.buttons & 4) != 0) {
         enterDragMode({x: e.offsetX, y: e.offsetY});
     }
+    if ((e.buttons & 1) != 0) {
+        enterSelectionMode({x: e.offsetX, y: e.offsetY});
+    }
 });
 fullviewport.addEventListener('mouseleave', (e) => {
     leaveDragMode();
+    leaveSelectionMode();
 });
 fullviewport.addEventListener('mouseup', (e) => {
     if ((e.buttons & 4) == 0) {
         leaveDragMode();
+    }
+    if ((e.buttons & 1) == 0) {
+        leaveSelectionMode();
     }
 });
 fullviewport.addEventListener("contextmenu", (e) => {
@@ -651,8 +707,11 @@ viewport.init(minPt, maxPt, 1000, async (n) => {
     return JSON.stringify(obj);
 });
 updateProgress();
+updatePlayIcon();
 
 setInterval(() => {
-    viewport.setFrame(viewport.currentFrame+1);
-    updateProgress();
+    if (!viewport.paused) {
+        viewport.setFrame(viewport.currentFrame+1);
+        updateProgress();
+    }
 }, 1000)
