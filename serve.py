@@ -9,6 +9,10 @@ import argparse
 def getroot():
     return static_file("index.html", root="./")
 
+@get("/<filepath:re:.*\\.ico>")
+def getfavicon(filepath):
+    return static_file(filepath, root="./")
+
 @get("/<filepath:re:.*\\.html>")
 def gethtml(filepath):
     return static_file(filepath, root="./")
