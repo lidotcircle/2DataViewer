@@ -88,7 +88,7 @@ class BoundingBox {
     }
 
     mergeBox(box) {
-        return this.mergePoint(box.getBL()).mergePoint(box.GetRT());
+        return this.mergePoint(box.getBL()).mergePoint(box.getTR());
     }
 
     move(vec) {
@@ -322,7 +322,7 @@ class DrawItem {
                 if (box == null) {
                     box = new BoundingBox(pt, pt);
                 } else {
-                    box = box.mergeBox(pt);
+                    box = box.mergePoint(pt);
                 }
             }
             return box;
