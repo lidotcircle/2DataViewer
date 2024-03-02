@@ -4,6 +4,7 @@ const progress = document.getElementById('progress');
 const timestamp = document.getElementById('timestamp');
 const fullviewport = document.getElementById('fullviewport');
 const screenviewport = document.getElementById('viewport');
+const fitScreen = document.getElementById('fit-screen');
 const reset = document.getElementById('reset');
 const scaleUp = document.getElementById('scale-up');
 const scaleDown = document.getElementById('scale-down');
@@ -75,7 +76,7 @@ class BoundingBox {
     }
 
     // Method to merge another point into the bounding box and return a new bounding box
-    merge(point) {
+    mergePoint(point) {
         // Calculate new bounding box coordinates
         const minX = Math.min(this.minX, point.x);
         const minY = Math.min(this.minY, point.y);
@@ -84,6 +85,10 @@ class BoundingBox {
 
         // Return a new BoundingBox object with the updated coordinates
         return new BoundingBox({ x: minX, y: minY }, { x: maxX, y: maxY });
+    }
+
+    mergeBox(box) {
+        return this.mergePoint(box.getBL()).mergePoint(box.GetRT());
     }
 
     move(vec) {
@@ -115,6 +120,10 @@ class BoundingBox {
         return {x: (this.getBL().x + this.getTR().x) / 2, y: (this.getBL().y + this.getTR().y) / 2};
     }
 
+    inflate(off) {
+        return new BoundingBox(PointSub(this.getBL(), {x: off, y: off}), PointAdd(this.getTR(), {x: off, y: off}));
+    }
+
     getBL() { return {x: this.minX, y: this.minY}; }
 
     getTR() { return {x: this.maxX, y: this.maxY}; }
@@ -126,7 +135,7 @@ function Box2boxTransformation(box1, box2)
     const c1 = box1.getCenter();
     const c2 = box2.getCenter();
     return new AffineTransformation(1, 0, 0, 1, c2.x, c2.y)
-        .concat(new AffineTransformation(s * 0.8, 0, 0, s * 0.8, 0, 0))
+        .concat(new AffineTransformation(s * 0.95, 0, 0, s * 0.95, 0, 0))
         .concat(new AffineTransformation(1, 0, 0, 1, -c1.x, -c1.y));
 }
 
@@ -146,6 +155,16 @@ class CLineData {
 }
 class PolygonData {
     m_pts;
+}
+
+function PointAdd(p1, p2)
+{
+    return {x: p1.x + p2.x, y: p1.y + p2.y };
+}
+
+function PointSub(p1, p2)
+{
+    return {x: p1.x - p2.x, y: p1.y - p2.y };
 }
 
 class DrawItem {
@@ -194,6 +213,30 @@ class DrawItem {
             this.m_style = newStyle;
         }
     } 
+
+    getBox() {
+        if (this.m_type == "circle") {
+            const r = this.m_circleData.m_radius;
+            const c = this.m_circleData.m_center;
+            return new BoundingBox(PointSub(c , {x: r, y: r}), PointAdd(c , {x: r, y: r}));
+        } else if (this.m_type == "line") {
+            return  new BoundingBox(this.m_lineData.m_p1, this.m_lineData.m_p2).inflate(this.m_lineData.m_width / 2);
+        } else if (this.m_type == "cline") {
+            return  new BoundingBox(this.m_clineData.m_p1, this.m_clineData.m_p2).inflate(this.m_clineData.m_width / 2);
+        } else if (this.m_type == "polygon") {
+            let box = null;
+            for (let pt of this.m_polygonData.m_pts) {
+                if (box == null) {
+                    box = new BoundingBox(pt, pt);
+                } else {
+                    box = box.mergeBox(pt);
+                }
+            }
+            return box;
+        } else {
+            return null;
+        }
+    }
 
     get type() { return this.m_type; }
 
@@ -352,6 +395,36 @@ class Viewport
         this.m_transform = AffineTransformation.identity();
         viewport.refreshDrawingCanvas();
     }
+    fitScreen()
+    {
+        let box = null;
+        for (let obj of this.m_objectList) {
+            const kbox = obj.getBox();
+            if (box == null) {
+                box = kbox;
+            } else {
+                if (kbox) {
+                    box = box.mergeBox(kbox);
+                }
+            }
+        }
+
+        if (box == null)
+        {
+            return;
+        }
+        box = box.inflate(10);
+
+        const boxviewport = new BoundingBox({
+            x: -this.m_canvas.width / 2,
+            y: -this.m_canvas.height/2
+        }, {
+            x: this.m_canvas.width / 2,
+            y: this.m_canvas.height/2
+        });
+        this.m_transform = Box2boxTransformation(box, boxviewport);
+        viewport.refreshDrawingCanvas();
+    }
     scaleUp(X, Y)
     {
         this.scale(1.1, 1.1, X, Y);
@@ -435,19 +508,22 @@ class Viewport
         this.refreshDrawingCanvas();
     }
 
-    init(minXY, maxXY, totalFrames, loader)
+    init(box, totalFrames, loader)
     {
         this.m_currentFrame = 0;
         this.m_totalFrames = totalFrames;
-        const box = new BoundingBox(minXY, maxXY);
-        const boxviewport = new BoundingBox({
-            x: -this.m_canvas.width / 2,
-            y: -this.m_canvas.height/2
-        }, {
-            x: this.m_canvas.width / 2,
-            y: this.m_canvas.height/2
-        });
-        this.m_transform = Box2boxTransformation(box, boxviewport);
+        if (box) {
+            const boxviewport = new BoundingBox({
+                x: -this.m_canvas.width / 2,
+                y: -this.m_canvas.height/2
+            }, {
+                x: this.m_canvas.width / 2,
+                y: this.m_canvas.height/2
+            });
+            this.m_transform = Box2boxTransformation(box, boxviewport);
+        } else {
+            this.m_transform = AffineTransformation.identity();
+        }
         this.m_loader = loader;
         this.setFrame(0);
     }
@@ -517,6 +593,7 @@ stop.addEventListener('click', stopViewport);
 progress.addEventListener('change', setViewportProgress);
 
 reset.addEventListener('click', () => viewport.reset());
+fitScreen.addEventListener('click', () => viewport.fitScreen());
 scaleUp.addEventListener('click', () => viewport.scaleUp());
 scaleDown.addEventListener('click', () => viewport.scaleDown());
 moveLeft.addEventListener('click', () => viewport.moveLeft());
@@ -600,117 +677,23 @@ fullviewport.addEventListener("contextmenu", (e) => {
     e.stopPropagation();
 });
 
-
-const baseFrame = [
-  {
-    "m_type": "circle",
-    "m_style": {},
-    "m_circleData": {
-      "m_center": {
-        "x": 0,
-        "y": 0
-      },
-      "m_radius": 100
-    }
-  },
-  {
-    "m_type": "circle",
-    "m_style": {},
-    "m_circleData": {
-      "m_center": {
-        "x": 800,
-        "y": 400
-      },
-      "m_radius": 100
-    }
-  },
-  {
-    "m_type": "line",
-    "m_style": {},
-    "m_lineData": {
-      "m_p1": {
-        "x": 200,
-        "y": 0
-      },
-      "m_p2": {
-        "x": 100,
-        "y": 0
-      },
-      "m_width": 10
-    }
-  },
-  {
-    "m_type": "cline",
-    "m_style": {},
-    "m_clineData": {
-      "m_p1": {
-        "x": 200,
-        "y": 200
-      },
-      "m_p2": {
-        "x": 100,
-        "y": 200
-      },
-      "m_width": 10
-    }
-  },
-  {
-    "m_type": "polygon",
-    "m_style": {},
-    "m_polygonData": {
-      "m_pts": [
-        {
-          "x": 100,
-          "y": 100
-        },
-        {
-          "x": 300,
-          "y": 300
-        },
-        {
-          "x": 200,
-          "y": 300
-        }
-      ]
-    }
-  }
-];
-
-function iteratePoints(object, func)
+async function setupConnection()
 {
-    for (let key in object) {
-        if (object.hasOwnProperty(key)) {
-            if (typeof object[key] == 'object') {
-                if ('x' in object[key] && 'y' in object[key]) {
-                    func(object[key]);
-                } else {
-                    iteratePoints(object[key], func);
-                }
-            }
+    viewport.init(null, 1000, async (n) => {
+        const API = location.protocol + "//" + location.host + "/frame/" + n;
+        const resp = await fetch(API);
+        const data = await resp.json();
+        return JSON.stringify(data["drawings"] || []);
+    });
+    updateProgress();
+    updatePlayIcon();
+
+    setInterval(async () => {
+        if (!viewport.paused) {
+            await viewport.setFrame(viewport.currentFrame+1);
+            updateProgress();
         }
-    }
+    }, 1000)
 }
 
-let minPt = {}, maxPt = {};
-iteratePoints(baseFrame, (pt) => {
-    minPt.x = minPt.x ? Math.min(minPt.x, pt.x) : pt.x;
-    minPt.y = minPt.y ? Math.min(minPt.y, pt.y) : pt.y;
-    maxPt.x = maxPt.x ? Math.max(maxPt.x, pt.x) : pt.x;
-    maxPt.y = maxPt.y ? Math.max(maxPt.y, pt.y) : pt.y;
-});
-
-viewport.init(minPt, maxPt, 1000, async (n) => {
-    const API = location.protocol + "//" + location.host + "/frame/" + n;
-    const resp = await fetch(API);
-    const data = await resp.json();
-    return JSON.stringify(data["drawings"] || []);
-});
-updateProgress();
-updatePlayIcon();
-
-setInterval(() => {
-    if (!viewport.paused) {
-        viewport.setFrame(viewport.currentFrame+1);
-        updateProgress();
-    }
-}, 1000)
+setupConnection();
