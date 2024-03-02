@@ -167,22 +167,98 @@ function findLineSegmentIntersection(A, B, C, D) {
     return null; // No intersection
 }
 
-class CircleData {
-    m_center;
-    m_radius;
+// Tokenize function (handles comments)
+function tokenize(inputString) {
+    const noComments = inputString.replace(/;.*$/gm, '');
+    const regex = /"[^"]*"|\(|\)|\d+\.\d+|\d+|\S+/g;
+    return noComments.match(regex) || [];
 }
-class LineData {
-    m_p1;
-    m_p2;
-    m_width;
+
+// Parse tokens into shape objects
+function parseTokens(tokens) {
+    const shapes = [];
+    let currentTokenIndex = 0;
+
+    function nextToken() {
+        return tokens[currentTokenIndex++];
+    }
+
+    function parseShape(type) {
+        const shape = { type };
+        while (currentTokenIndex < tokens.length && tokens[currentTokenIndex] !== ')') {
+            nextToken();
+            let key = nextToken();
+            if (key === 'point' && (shape['type'] === 'line' || shape['type'] === 'cline')) {
+                key = shape['point1'] ? 'point2' : 'point1';
+            }
+            if (key === 'point' || key === 'point1' || key === 'point2' || key === 'center') {
+                const x = parseFloat(nextToken());
+                const y = parseFloat(nextToken());
+                const value = { x, y };
+                if (shape.type === 'polygon') {
+                    shape.points = shape.points || [];
+                    shape.points.push(value);
+                } else {
+                    shape[key] = value;
+                }
+            } else if (key === 'radius' || key === 'width') {
+                shape[key] = parseFloat(nextToken());
+            } else if (key === 'color') {
+                shape[key] = nextToken().replace(/"/g, '');
+            }
+            nextToken();
+        }
+        currentTokenIndex++; // Skip closing parenthesis
+        return shape;
+    }
+
+    while (currentTokenIndex < tokens.length) {
+        const token = nextToken();
+        if (token === '(') {
+            const k = nextToken(); // Skip 'scene' or shape type token, handled in parseShape
+            if (k !== 'scene') {
+                shapes.push(parseShape(k));
+            }
+        }
+    }
+
+    return shapes;
 }
-class CLineData {
-    m_p1;
-    m_p2;
-    m_width;
+
+// Serialize shape object to Lisp-like string
+function serializeShape(shape) {
+    let serialized = `(${shape["type"]}`;
+    if (shape["type"] === "polygon") {
+        shape["points"].forEach(point => {
+            serialized += ` (point ${point["x"]} ${point["y"]})`;
+        });
+    } else {
+        if ("point1" in shape) {
+            serialized += ` (point ${shape["point1"]["x"]} ${shape["point1"]["y"]})`;
+            serialized += ` (point ${shape["point2"]["x"]} ${shape["point2"]["y"]})`;
+        }
+        if ("center" in shape) {
+            serialized += ` (center ${shape["center"]["x"]} ${shape["center"]["y"]})`;
+            serialized += ` (radius ${shape["radius"]})`;
+        }
+    }
+    if ("width" in shape) {
+        serialized += ` (width ${shape["width"]})`;
+    }
+    if ("color" in shape) {
+        serialized += ` (color "${shape["color"]}")`;
+    }
+    serialized += ')';
+    return serialized;
 }
-class PolygonData {
-    m_pts;
+
+function serializeShapes(shapes) {
+    let serialized = "(scene\n";
+    shapes.forEach(shape => {
+        serialized += "  " + serializeShape(shape) + "\n";
+    });
+    serialized += ")";
+    return serialized;
 }
 
 function PointAdd(p1, p2)
@@ -198,62 +274,51 @@ function PointSub(p1, p2)
 class DrawItem {
     static CreateCircle(center, radius) {
         let ans = new DrawItem("circle");
-        ans.m_circleData = new CircleData();
-        ans.m_circleData.m_center = center;
-        ans.m_circleData.m_radius = radius;
+        ans.center = center;
+        ans.radius = radius;
         return ans;
     }
     static CreateLine(ptA, ptB, width) {
         let ans = new DrawItem("line");
-        ans.m_lineData = new LineData();
-        ans.m_lineData.m_p1 = ptA;
-        ans.m_lineData.m_p2 = ptB;
-        ans.m_lineData.m_width = width;
+        ans.point1 = ptA;
+        ans.point2 = ptB;
+        ans.width = width;
         return ans;
     }
     static CreateCLine(ptA, ptB, width) {
         let ans = new DrawItem("cline");
-        ans.m_clineData = new CLineData();
-        ans.m_clineData.m_p1 = ptA;
-        ans.m_clineData.m_p2 = ptB;
-        ans.m_clineData.m_width = width;
+        ans.point1 = ptA;
+        ans.point2 = ptB;
+        ans.width = width;
         return ans;
     }
-    static CreatePolygon(pts) {
+    static CreatePolygon(points) {
         let ans = new DrawItem("polygon");
-        ans.m_polygonData = new PolygonData();
-        ans.m_polygonData.m_pts = pts;
+        ans.points = points;
         return ans;
     }
 
     constructor(type) {
-        this.m_type = type;
-        this.m_style = {
-            fillStyle: this.m_defaultColor,
-            strokeStyle: this.m_defaultColor,
-        };
+        this.type = type;
+        this.color = "rgba(99, 99, 99, 0.99)";;
     }
 
-    setStyle(newStyle) {
-        if (newStyle == null) {
-            this.m_style = {};
-        } else {
-            this.m_style = newStyle;
-        }
+    setColor(color) {
+        this.color = color;
     } 
 
     getBox() {
-        if (this.m_type == "circle") {
-            const r = this.m_circleData.m_radius;
-            const c = this.m_circleData.m_center;
+        if (this.type == "circle") {
+            const r = this.radius;
+            const c = this.center;
             return new BoundingBox(PointSub(c , {x: r, y: r}), PointAdd(c , {x: r, y: r}));
-        } else if (this.m_type == "line") {
-            return  new BoundingBox(this.m_lineData.m_p1, this.m_lineData.m_p2).inflate(this.m_lineData.m_width / 2);
-        } else if (this.m_type == "cline") {
-            return  new BoundingBox(this.m_clineData.m_p1, this.m_clineData.m_p2).inflate(this.m_clineData.m_width / 2);
-        } else if (this.m_type == "polygon") {
+        } else if (this.type == "line") {
+            return  new BoundingBox(this.point1, this.point2).inflate(this.width / 2);
+        } else if (this.type == "cline") {
+            return  new BoundingBox(this.point1, this.point2).inflate(this.width / 2);
+        } else if (this.type == "polygon") {
             let box = null;
-            for (let pt of this.m_polygonData.m_pts) {
+            for (let pt of this.points) {
                 if (box == null) {
                     box = new BoundingBox(pt, pt);
                 } else {
@@ -265,15 +330,6 @@ class DrawItem {
             return null;
         }
     }
-
-    get type() { return this.m_type; }
-
-    m_type;
-    m_style;
-    m_circleData;
-    m_lineData;
-    m_clineData;
-    m_polygonData;
 }
 
 class Viewport
@@ -290,27 +346,27 @@ class Viewport
         this.fitCanvas();
     }
 
-    DrawCircle(center, radius, style) {
+    DrawCircle(center, radius, color) {
         let circle = DrawItem.CreateCircle(center, radius);
-        circle.setStyle(style);
+        circle.setColor(color);
         this.m_objectList.push(circle);
     }
 
-    DrawLine(start, end, width, style) {
+    DrawLine(start, end, width, color) {
         let line = DrawItem.CreateLine(start, end, width);
-        line.setStyle(style);
+        line.setColor(color);
         this.m_objectList.push(line);
     }
 
-    DrawCLine(start, end, width, style) {
+    DrawCLine(start, end, width, color) {
         let cline = DrawItem.CreateCLine(start, end, width);
-        cline.setStyle(style);
+        cline.setColor(color);
         this.m_objectList.push(cline);
     }
 
-    DrawPolygon(pts, style) {
-        let polygon = DrawItem.CreatePolygon(pts);
-        polygon.setStyle(style);
+    DrawPolygon(points, color) {
+        let polygon = DrawItem.CreatePolygon(points);
+        polygon.setColor(color);
         this.m_objectList.push(polygon);
     }
 
@@ -324,46 +380,46 @@ class Viewport
         ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
         for (let item of this.m_objectList) {
             if (item.type == "line") {
-                ctx.strokeStyle = item.m_style.strokeStyle || this.m_defaultColor;
-                ctx.lineWidth = item.m_lineData.m_width;
+                ctx.strokeStyle = item.color;
+                ctx.lineWidth = item.width;
                 const path = new Path2D();
-                path.lineTo(item.m_lineData.m_p1.x, item.m_lineData.m_p1.y);
-                path.lineTo(item.m_lineData.m_p2.x, item.m_lineData.m_p2.y);
+                path.lineTo(item.point1.x, item.point1.y);
+                path.lineTo(item.point2.x, item.point2.y);
                 ctx.stroke(path);
             } else if (item.type == "circle") {
-                ctx.fillStyle = item.m_style.fillStyle || this.m_defaultColor;
+                ctx.fillStyle = item.color;
                 const path = new Path2D();
-                path.ellipse(item.m_circleData.m_center.x, item.m_circleData.m_center.y, item.m_circleData.m_radius,
-                             item.m_circleData.m_radius, 0, 0, 360);;
+                path.ellipse(item.center.x, item.center.y, item.radius,
+                             item.radius, 0, 0, 360);;
                 ctx.fill(path);
             } else if (item.type == "cline") {
-                ctx.strokeStyle = item.m_style.strokeStyle || this.m_defaultColor;
-                ctx.lineWidth = item.m_clineData.m_width;
+                ctx.strokeStyle = item.color;
+                ctx.lineWidth = item.width;
                 {
                     const path = new Path2D();
-                    path.lineTo(item.m_clineData.m_p1.x, item.m_clineData.m_p1.y);
-                    path.lineTo(item.m_clineData.m_p2.x, item.m_clineData.m_p2.y);
+                    path.lineTo(item.point1.x, item.point1.y);
+                    path.lineTo(item.point2.x, item.point2.y);
                     ctx.stroke(path);
                 }
                 {
-                    ctx.fillStyle = item.m_style.strokeStyle || this.m_defaultColor;
+                    ctx.fillStyle = item.color;
                     const path = new Path2D();
-                    path.ellipse(item.m_clineData.m_p1.x, item.m_clineData.m_p1.y, item.m_clineData.m_width / 2,
-                        item.m_clineData.m_width / 2, 0, 0, 360);;
+                    path.ellipse(item.point1.x, item.point1.y, item.width / 2,
+                        item.width / 2, 0, 0, 360);;
                     ctx.fill(path);
                 }
                 {
-                    ctx.fillStyle = item.m_style.strokeStyle || this.m_defaultColor;
+                    ctx.fillStyle = item.color;
                     const path = new Path2D();
-                    path.ellipse(item.m_clineData.m_p2.x, item.m_clineData.m_p2.y, item.m_clineData.m_width / 2,
-                        item.m_clineData.m_width / 2, 0, 0, 360);;
+                    path.ellipse(item.point2.x, item.point2.y, item.width / 2,
+                        item.width / 2, 0, 0, 360);;
                     ctx.fill(path);
                 }
             } else if (item.type == "polygon") {
-                ctx.fillStyle = item.m_style.fillStyle || this.m_defaultColor;
+                ctx.fillStyle = item.color;
                 {
                     const path = new Path2D();
-                    for (let p of item.m_polygonData.m_pts) {
+                    for (let p of item.points) {
                         path.lineTo(p.x, p.y);
                     }
                     path.closePath();
@@ -585,7 +641,7 @@ class Viewport
         this.m_objectList = [];
         const objlist = JSON.parse(text);
         for (let obj of objlist) {
-            const drawItem = new DrawItem(obj.m_type)
+            const drawItem = new DrawItem(obj.type)
             Object.assign(drawItem, obj);
             this.m_objectList.push(drawItem);
         }
@@ -616,7 +672,7 @@ class Viewport
     m_currentFrame = 0;
     m_totalFrames = 30;
     m_loader;
-    m_defaultColor = "white";
+    m_defaultColor = "rgba(18, 18, 18, 0.8)";
     m_transform;
     m_viewportEl;
     m_objectList;

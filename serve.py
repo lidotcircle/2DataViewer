@@ -3,6 +3,99 @@
 
 from bottle import get, run, static_file
 import argparse
+import re
+
+
+def tokenize(input_string):
+    # Pattern to match tokens, improved to ignore comments
+    token_pattern = r'\"[^\"]*\"|\(|\)|\d+\.\d+|\d+|\S+'
+    # Split the input string into lines to handle comments
+    lines = input_string.split('\n')
+    tokens = []
+    for line in lines:
+        # Ignore content after a semicolon (comment)
+        line = line.split(';', 1)[0]
+        tokens.extend(re.findall(token_pattern, line))
+    return tokens
+
+def parse_tokens(tokens):
+    def next_token():
+        return tokens.pop(0) if tokens else None
+
+    def parse_shape():
+        shape = {"type": next_token()}
+        while tokens and tokens[0] != ')':
+            if tokens[0] == '(':
+                next_token()  # Consume '('
+                key = next_token()
+                if shape["type"] in ["line", "cline"] and key == "point":
+                    key = "point2" if "point1" in shape else "point1"
+                if key in ['point', 'point1', 'point2', 'center']:
+                    x = float(next_token())
+                    y = float(next_token())
+                    value = {'x': x, 'y': y}
+                elif key in ['radius', 'width']:
+                    value = float(next_token())
+                elif key == 'color':
+                    value = next_token().strip('"')
+                next_token()  # Consume ')'
+                if shape["type"] == "polygon" and key == "point":
+                    shape.setdefault("points", []).append(value)
+                else:
+                    shape[key] = value
+            else:
+                break  # Unexpected token
+        next_token()  # Consume closing ')'
+        return shape
+
+    def parse_scene():
+        shapes = []
+        next_token()  # Consume 'scene'
+        while tokens and tokens[0] != ')':
+            if tokens[0] == '(':
+                next_token()  # Consume opening '('
+                if tokens[0] in ['cline', 'line', 'circle', 'polygon']:
+                    shapes.append(parse_shape())
+                else:
+                    print(f"Unknown shape type: {tokens[0]}")
+            else:
+                next_token()  # Skip unexpected tokens
+        next_token()  # Consume closing ')' for 'scene'
+        return shapes
+
+    # Start parsing from the 'scene' keyword
+    if tokens and tokens[0] == '(' and tokens[1] == 'scene':
+        return parse_scene()
+    else:
+        print("Input does not start with a scene.")
+        return []
+
+
+def serialize_shape(shape):
+    serialized = f'({shape["type"]}'
+    if shape["type"] == "polygon":
+        for point in shape["points"]:
+            serialized += f' (point {point["x"]} {point["y"]})'
+    else:
+        if "point1" in shape:  # For lines
+            serialized += f' (point {shape["point1"]["x"]} {shape["point1"]["y"]})'
+            serialized += f' (point {shape["point2"]["x"]} {shape["point2"]["y"]})'
+        if "center" in shape:  # For circles
+            serialized += f' (center {shape["center"]["x"]} {shape["center"]["y"]})'
+            serialized += f' (radius {shape["radius"]})'
+    if "width" in shape:  # For lines with width
+        serialized += f' (width {shape["width"]})'
+    if "color" in shape:  # Color for any shape
+        serialized += f' (color "{shape["color"]}")'
+    serialized += ')'
+    return serialized
+
+def serialize_shapes(shapes):
+    serialized = "(scene\n"
+    for shape in shapes:
+        serialized += "  " + serialize_shape(shape) + "\n"
+    serialized += ")"
+    return serialized
 
 
 @get("/")
@@ -48,8 +141,9 @@ def getFrame(nx):
     n = int(nx)
     openInput.seek(frameOffset[n])
     text = openInput.readline().strip()
-    
-    return { "drawings": [{ "m_type": "circle", "m_circleData": { "m_center": { "x": 0, "y": 0 }, "m_radius": int(n) * 10 + 99 }}] }
+    tokens = tokenize(text)
+    shapes = parse_tokens(tokens)
+    return { "drawings": shapes }
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="serve 2DataViewer")
