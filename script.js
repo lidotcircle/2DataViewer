@@ -139,6 +139,34 @@ function Box2boxTransformation(box1, box2)
         .concat(new AffineTransformation(1, 0, 0, 1, -c1.x, -c1.y));
 }
 
+function findLineSegmentIntersection(A, B, C, D) {
+    // Calculate differences
+    let diffBA = { x: B.x - A.x, y: B.y - A.y };
+    let diffDC = { x: D.x - C.x, y: D.y - C.y };
+    let diffCA = { x: C.x - A.x, y: C.y - A.y };
+
+    // Determinant
+    let det = diffBA.x * diffDC.y - diffBA.y * diffDC.x;
+    // If determinant is zero, lines are parallel or coincident
+    if (det === 0) {
+        return null; // No intersection
+    }
+
+    let t = (diffCA.x * diffDC.y - diffCA.y * diffDC.x) / det;
+    let u = (diffCA.x * diffBA.y - diffCA.y * diffBA.x) / det;
+
+    // Check if 0 <= t <= 1 and 0 <= u <= 1
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        // Intersection point
+        return {
+            x: A.x + t * diffBA.x,
+            y: A.y + t * diffBA.y
+        };
+    }
+
+    return null; // No intersection
+}
+
 class CircleData {
     m_center;
     m_radius;
@@ -255,6 +283,7 @@ class Viewport
         this.m_viewportEl = document.getElementById(canvasId)
         this.m_canvas = this.m_viewportEl.querySelector("canvas.drawing");
         this.m_selectionBox = this.m_viewportEl.querySelector("canvas.selection");
+        this.m_coordinationBox = this.m_viewportEl.querySelector("canvas.coordination");
 		this.m_transform = AffineTransformation.identity();
         this.m_objectList = [];
         window.addEventListener("resize", () => this.fitCanvas());
@@ -342,6 +371,59 @@ class Viewport
                 }
             }
         }
+
+        this.refreshCoordination();
+    }
+
+    refreshCoordination() {
+        let ctx = this.m_coordinationBox.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.m_coordinationBox.width, this.m_coordinationBox.height);
+
+        const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
+        const t = baseTrans.concat(this.m_transform);
+        ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
+        const w1 = this.m_coordinationBox.width / 2;
+        const h1 = this.m_coordinationBox.height / 2;
+        const a = this.m_transform.revertXY({x: -w1, y: -h1});
+        const b = this.m_transform.revertXY({x: -w1, y: h1});
+        const c = this.m_transform.revertXY({x: w1, y: h1});
+        const d = this.m_transform.revertXY({x: w1, y: -h1});
+        const un = 2 ** 30;
+        const k1 = { x: -un, y: 0 };
+        const k2 = { x: un, y: 0 };
+        const m1 = { x: 0, y: 0 - un };
+        const m2 = { x: 0, y: un };
+
+        const fn = (s1, s2) => {
+            const ans = [];
+            const u1 = findLineSegmentIntersection(s1, s2, a, b);
+            const u2 = findLineSegmentIntersection(s1, s2, b, c);
+            const u3 = findLineSegmentIntersection(s1, s2, c, d);
+            const u4 = findLineSegmentIntersection(s1, s2, d, a);
+            if (u1) ans.push(u1);
+            if (u2) ans.push(u2);
+            if (u3) ans.push(u3);
+            if (u4) ans.push(u4);
+            if (ans.length >= 2) {
+                return ans.slice(0, 2);
+            }
+            return null;
+        };
+        const s1 = fn(k1, k2);
+        const s2 = fn(m1, m2);
+        const segs = [];
+        if (s1) segs.push(s1);
+        if (s2) segs.push(s2);
+
+        for (let seg of segs) {
+            const path = new Path2D();
+            path.lineTo(seg[0].x, seg[0].y);
+            path.lineTo(seg[1].x, seg[1].y);
+            ctx.strokeStyle = "rgba(60, 60, 60, 0.5)";
+            ctx.lineWidth = 1;
+            ctx.stroke(path);
+        }
     }
 
     drawSelection(start, to) {
@@ -376,6 +458,8 @@ class Viewport
         this.m_canvas.height = this.m_viewportEl.clientHeight;
         this.m_selectionBox.width = this.m_viewportEl.clientWidth;
         this.m_selectionBox.height = this.m_viewportEl.clientHeight;
+        this.m_coordinationBox.width = this.m_viewportEl.clientWidth;
+        this.m_coordinationBox.height = this.m_viewportEl.clientHeight;
         this.refreshDrawingCanvas();
     }
 
