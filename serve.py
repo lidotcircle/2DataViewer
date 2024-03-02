@@ -123,14 +123,25 @@ def getfonts(filepath):
     return static_file(filepath, root="fonts")
 
 global minCoord, maxCoord, frameOffset, openInput
-minCoord = None
-maxCoord = None
+minCoord = {}
+maxCoord = {}
 frameOffset = []
 openInput = None
 
+def mergePoint(p):
+    global minCoord, maxCoord
+    if len(minCoord) == 0:
+        minCoord = p
+        maxCoord = {"x": p["x"], "y": p["y"]}
+    else:
+        minCoord["x"] = min(minCoord["x"], p["x"])
+        minCoord["y"] = min(minCoord["y"], p["y"])
+        maxCoord["x"] = max(maxCoord["x"], p["x"])
+        maxCoord["y"] = max(maxCoord["y"], p["y"])
+
 @get("/data-info")
 def datainfo():
-    if len(frameOffset) == 0 or minCoord is None or maxCoord is None:
+    if len(frameOffset) == 0 or len(minCoord) == 0 or len(maxCoord) == 0:
         return {}
     else:
         return { "minxy": minCoord, "maxxy": maxCoord, "nframes": len(frameOffset) }
@@ -139,6 +150,8 @@ def datainfo():
 def getFrame(nx):
     assert(openInput is not None)
     n = int(nx)
+    if n >= len(frameOffset):
+        return { "drawings": [] }
     openInput.seek(frameOffset[n])
     text = openInput.readline().strip()
     tokens = tokenize(text)
@@ -155,10 +168,30 @@ if __name__ == "__main__":
     openInput = open(args.input, "r")
     while True:
         off = openInput.tell()
-        n = openInput.readline()
+        n = openInput.readline().strip()
         if n == '':
             break
-        else:
-            frameOffset.append(off)
+        try:
+            shapes = parse_tokens(tokenize(n))
+            for s in shapes:
+                if s["type"] == "circle":
+                    c = s["center"]
+                    r = s["radius"]
+                    mergePoint({"x": c["x"] - r, "y": c["y"] - r})
+                    mergePoint({"x": c["x"] - r, "y": c["y"] + r})
+                    mergePoint({"x": c["x"] + r, "y": c["y"] + r})
+                    mergePoint({"x": c["x"] + r, "y": c["y"] - r})
+                elif s["type"] == "line":
+                    mergePoint(s["point1"])
+                    mergePoint(s["point2"])
+                elif s["type"] == "cline":
+                    mergePoint(s["point1"])
+                    mergePoint(s["point2"])
+                elif s["type"] == "polygon":
+                    for pt in s["points"]:
+                        mergePoint(pt)
+        except:
+            pass
+        frameOffset.append(off)
 
     run(host=args.host, port=args.port)

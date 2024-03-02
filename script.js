@@ -819,7 +819,17 @@ fullviewport.addEventListener("contextmenu", (e) => {
 
 async function setupConnection()
 {
-    viewport.init(null, 1000, async (n) => {
+    const INFOAPI = location.protocol + "//" + location.host + "/data-info";
+    const resp = await fetch(INFOAPI);
+    const data = await resp.json();
+    let box = null;
+    let nframes = 0;
+    if (data["minxy"]) {
+        box = new BoundingBox(data["minxy"], data["maxxy"]);
+        nframes = data["nframes"];
+    }
+
+    viewport.init(box, nframes, async (n) => {
         const API = location.protocol + "//" + location.host + "/frame/" + n;
         const resp = await fetch(API);
         const data = await resp.json();
