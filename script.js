@@ -700,11 +700,10 @@ iteratePoints(baseFrame, (pt) => {
 });
 
 viewport.init(minPt, maxPt, 1000, async (n) => {
-    const obj = JSON.parse(JSON.stringify(baseFrame));
-    iteratePoints(obj, (pt) => {
-        pt.x += n * 10;
-    });
-    return JSON.stringify(obj);
+    const API = location.protocol + "//" + location.host + "/frame/" + n;
+    const resp = await fetch(API);
+    const data = await resp.json();
+    return JSON.stringify(data["drawings"] || []);
 });
 updateProgress();
 updatePlayIcon();
