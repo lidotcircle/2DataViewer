@@ -332,6 +332,7 @@ class DrawItem {
     }
 }
 
+const RTREE_ITEM_ID = Symbol("RTREE_ITEM_ID");
 class Viewport
 {
     constructor(canvasId)
@@ -342,32 +343,129 @@ class Viewport
         this.m_coordinationBox = this.m_viewportEl.querySelector("canvas.coordination");
 		this.m_transform = AffineTransformation.identity();
         this.m_objectList = [];
+        this.m_objectRTree = rbush();
         window.addEventListener("resize", () => this.fitCanvas());
         this.fitCanvas();
+    }
+
+    addDrawingObject(obj) {
+        this.m_objectList.push(obj);
+        const box = obj.getBox();
+        const item = {
+            minX: box.getBL().x,
+            minY: box.getBL().y,
+            maxX: box.getTR().x,
+            maxY: box.getTR().y,
+            object: obj
+        };
+        this.m_objectRTree.insert(item);
+        obj[RTREE_ITEM_ID] = item;
+    }
+
+    removeDrawingObject(obj) {
+        const idx = this.m_objectList.indexOf(obj);
+        if (idx != -1) {
+            this.m_objectList.splice(idx, 1);
+            const item = obj[RTREE_ITEM_ID];
+            if (item == null) {
+                this.m_objectRTree.remove(item);
+            }
+        }
+    }
+
+    moveDrawingObject(obj) {
+        const idx = this.m_objectList.indexOf(obj);
+        if (idx != -1) {
+            const item = obj[RTREE_ITEM_ID];
+            if (item == null) {
+                this.m_objectRTree.remove(item);
+                const box = obj.getBox();
+                const item = {
+                    minX: box.getBL().x,
+                    minY: box.getBL().y,
+                    maxX: box.getTR().x,
+                    maxY: box.getTR().y,
+                    object: obj
+                };
+                this.m_objectRTree.insert(item);
+                obj[RTREE_ITEM_ID] = item;
+            }
+        }
     }
 
     DrawCircle(center, radius, color) {
         let circle = DrawItem.CreateCircle(center, radius);
         circle.setColor(color);
-        this.m_objectList.push(circle);
+        this.addDrawingObject(circle);
     }
 
     DrawLine(start, end, width, color) {
         let line = DrawItem.CreateLine(start, end, width);
         line.setColor(color);
-        this.m_objectList.push(line);
+        this.addDrawingObject(line);
     }
 
     DrawCLine(start, end, width, color) {
         let cline = DrawItem.CreateCLine(start, end, width);
         cline.setColor(color);
-        this.m_objectList.push(cline);
+        this.addDrawingObject(cline);
     }
 
     DrawPolygon(points, color) {
         let polygon = DrawItem.CreatePolygon(points);
         polygon.setColor(color);
-        this.m_objectList.push(polygon);
+        this.addDrawingObject(polygon);
+    }
+
+    static drawItemInCanvas(ctx, item) {
+        if (item.type == "line") {
+            ctx.strokeStyle = item.color;
+            ctx.lineWidth = item.width;
+            const path = new Path2D();
+            path.lineTo(item.point1.x, item.point1.y);
+            path.lineTo(item.point2.x, item.point2.y);
+            ctx.stroke(path);
+        } else if (item.type == "circle") {
+            ctx.fillStyle = item.color;
+            const path = new Path2D();
+            path.ellipse(item.center.x, item.center.y, item.radius,
+                item.radius, 0, 0, 360);;
+            ctx.fill(path);
+        } else if (item.type == "cline") {
+            ctx.strokeStyle = item.color;
+            ctx.lineWidth = item.width;
+            {
+                const path = new Path2D();
+                path.lineTo(item.point1.x, item.point1.y);
+                path.lineTo(item.point2.x, item.point2.y);
+                ctx.stroke(path);
+            }
+            {
+                ctx.fillStyle = item.color;
+                const path = new Path2D();
+                path.ellipse(item.point1.x, item.point1.y, item.width / 2,
+                    item.width / 2, 0, 0, 360);;
+                ctx.fill(path);
+            }
+            {
+                ctx.fillStyle = item.color;
+                const path = new Path2D();
+                path.ellipse(item.point2.x, item.point2.y, item.width / 2,
+                    item.width / 2, 0, 0, 360);;
+                ctx.fill(path);
+            }
+        } else if (item.type == "polygon") {
+            ctx.fillStyle = item.color;
+            {
+                const path = new Path2D();
+                for (let p of item.points) {
+                    path.lineTo(p.x, p.y);
+                }
+                path.closePath();
+                ctx.fill(path);
+            }
+        }
+
     }
 
     refreshDrawingCanvas() {
@@ -379,53 +477,7 @@ class Viewport
         const t = baseTrans.concat(this.m_transform);
         ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
         for (let item of this.m_objectList) {
-            if (item.type == "line") {
-                ctx.strokeStyle = item.color;
-                ctx.lineWidth = item.width;
-                const path = new Path2D();
-                path.lineTo(item.point1.x, item.point1.y);
-                path.lineTo(item.point2.x, item.point2.y);
-                ctx.stroke(path);
-            } else if (item.type == "circle") {
-                ctx.fillStyle = item.color;
-                const path = new Path2D();
-                path.ellipse(item.center.x, item.center.y, item.radius,
-                             item.radius, 0, 0, 360);;
-                ctx.fill(path);
-            } else if (item.type == "cline") {
-                ctx.strokeStyle = item.color;
-                ctx.lineWidth = item.width;
-                {
-                    const path = new Path2D();
-                    path.lineTo(item.point1.x, item.point1.y);
-                    path.lineTo(item.point2.x, item.point2.y);
-                    ctx.stroke(path);
-                }
-                {
-                    ctx.fillStyle = item.color;
-                    const path = new Path2D();
-                    path.ellipse(item.point1.x, item.point1.y, item.width / 2,
-                        item.width / 2, 0, 0, 360);;
-                    ctx.fill(path);
-                }
-                {
-                    ctx.fillStyle = item.color;
-                    const path = new Path2D();
-                    path.ellipse(item.point2.x, item.point2.y, item.width / 2,
-                        item.width / 2, 0, 0, 360);;
-                    ctx.fill(path);
-                }
-            } else if (item.type == "polygon") {
-                ctx.fillStyle = item.color;
-                {
-                    const path = new Path2D();
-                    for (let p of item.points) {
-                        path.lineTo(p.x, p.y);
-                    }
-                    path.closePath();
-                    ctx.fill(path);
-                }
-            }
+            Viewport.drawItemInCanvas(ctx, item);
         }
 
         this.refreshCoordination();
@@ -489,7 +541,9 @@ class Viewport
         ctx.fillStyle = "rgba(93, 93, 255, 0.3)";
         const width = Math.abs(to.x - start.x);
         const height = Math.abs(to.y - start.y);
-        ctx.fillRect(Math.min(start.x, to.x), Math.min(start.y, to.y), width, height);
+        const minX = Math.min(start.x, to.x);
+        const minY = Math.min(start.y, to.y)
+        ctx.fillRect(minX, minY, width, height);
 
         ctx.strokeStyle = "rgba(80, 80, 255, 0.8)";
         ctx.lineWidth = 2;
@@ -500,12 +554,39 @@ class Viewport
         path.lineTo(to.x, start.y);
         path.closePath();
         ctx.stroke(path);
+        this.m_selectionStart = start;
+        this.m_selectionTo = to;
+        this.drawSelectedItem(this.m_selectionStart, this.m_selectionTo);
+    }
+
+    drawSelectedItem(start, to) {
+        if (start == null || to == null) return;
+        let ctx = this.m_selectionBox.getContext("2d");
+        const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
+        const t = baseTrans.concat(this.m_transform);
+        const box = new BoundingBox(t.revertXY(start), t.revertXY(to));
+        const itemList = this.m_objectRTree.search({
+            minX: box.getBL().x, minY: box.getBL().y,
+            maxX: box.getTR().x, maxY: box.getTR().y
+        });
+        ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
+        for (let item of itemList) {
+            const obj = item["object"];
+            const oldColor = obj.color;
+            try {
+                obj.color = "rgba(200, 200, 230, 0.3)";
+                Viewport.drawItemInCanvas(ctx, item["object"]);
+            } finally {
+                obj.color = oldColor;
+            }
+        }
     }
 
     clearSelection() {
         let ctx = this.m_selectionBox.getContext("2d");
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.m_selectionBox.width, this.m_selectionBox.height);
+        this.drawSelectedItem(this.m_selectionStart, this.m_selectionTo);
     }
 
     fitCanvas()
@@ -643,7 +724,7 @@ class Viewport
         for (let obj of objlist) {
             const drawItem = new DrawItem(obj.type)
             Object.assign(drawItem, obj);
-            this.m_objectList.push(drawItem);
+            this.addDrawingObject(drawItem);
         }
         this.refreshDrawingCanvas();
     }
@@ -770,6 +851,7 @@ function enterSelectionMode(pt)
     isInSelectionMode = true;
     selectionStart = pt
     fullviewport.classList.add("selection-mode");
+    viewport.drawSelection(pt, pt);
 }
 function leaveSelectionMode()
 {
