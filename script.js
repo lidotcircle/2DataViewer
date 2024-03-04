@@ -170,7 +170,7 @@ function findLineSegmentIntersection(A, B, C, D) {
 // Tokenize function (handles comments)
 function tokenize(inputString) {
     const noComments = inputString.replace(/;.*$/gm, '');
-    const regex = /"[^"]*"|\(|\)|\d+\.\d+|\d+|\S+/g;
+    const regex = /"[^"]*"|\(|\)|-?\d+\.\d+|-?\d+|\S+/g;
     return noComments.match(regex) || [];
 }
 
@@ -720,6 +720,7 @@ class Viewport
         this.m_currentFrame = Math.max(Math.min(n, this.m_totalFrames - 1), 0);
         const text = await this.m_loader(this.m_currentFrame);
         this.m_objectList = [];
+        this.m_objectRTree.clear();
         const objlist = JSON.parse(text);
         for (let obj of objlist) {
             const drawItem = new DrawItem(obj.type)

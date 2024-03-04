@@ -8,7 +8,7 @@ import re
 
 def tokenize(input_string):
     # Pattern to match tokens, improved to ignore comments
-    token_pattern = r'\"[^\"]*\"|\(|\)|\d+\.\d+|\d+|\S+'
+    token_pattern = r'\"[^\"]*\"|\(|\)|-?\d+\.\d+|-?\d+|\S+'
     # Split the input string into lines to handle comments
     lines = input_string.split('\n')
     tokens = []
