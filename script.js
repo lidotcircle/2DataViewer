@@ -1,5 +1,9 @@
 const play = document.getElementById('play');
 const stop = document.getElementById('stop');
+const framePerSec = document.getElementById('frame-per-second');
+const commandLineBar = document.getElementById('command-line-input');
+const inputBar = document.getElementById('input-bar');
+const errorBar = document.getElementById('error-bar');
 const progress = document.getElementById('progress');
 const timestamp = document.getElementById('timestamp');
 const fullviewport = document.getElementById('fullviewport');
@@ -332,6 +336,13 @@ class DrawItem {
     }
 }
 
+function showError(msg)
+{
+    errorBar.classList.add("error-bar-show");
+    errorBar.innerText = msg;
+    setTimeout(() => errorBar.classList.remove("error-bar-show"), 2000);
+}
+
 const RTREE_ITEM_ID = Symbol("RTREE_ITEM_ID");
 class Viewport
 {
@@ -415,6 +426,47 @@ class Viewport
         let polygon = DrawItem.CreatePolygon(points);
         polygon.setColor(color);
         this.addDrawingObject(polygon);
+    }
+
+    cmdZoom() {
+        this.fitScreen();
+    }
+
+    cmdClear() {
+        this.m_objectList = [];
+        this.m_objectRTree.clear();
+    }
+
+    cmdDraw(args) {
+        let addn = 0;
+        try {
+            const tokens = tokenize(args);
+            const items = parseTokens(tokens);
+            for (let item of items) {
+                const drawItem = new DrawItem(item.type)
+                Object.assign(drawItem, item);
+                this.addDrawingObject(drawItem);
+                addn++;
+            }
+        } catch (err) { showError(err); }
+        if (addn > 0) {
+            this.refreshDrawingCanvas();
+        }
+    }
+
+    executeCommand(cmd) {
+        const c = cmd.split(' ')[0];
+        if (c === 'draw') {
+            this.cmdDraw(cmd.substr(5));
+        } else if (c === 'clear') {
+            this.cmdClear();
+            this.refreshDrawingCanvas();
+            this.clearSelection();
+        } else if (c === 'zoom') {
+            this.cmdZoom();
+        }else {
+            showError(`cann't not execute '${cmd}'`);
+        }
     }
 
     static drawItemInCanvas(ctx, item) {
@@ -719,8 +771,7 @@ class Viewport
         if (n > this.m_totalFrames - 1) return;
         this.m_currentFrame = Math.max(Math.min(n, this.m_totalFrames - 1), 0);
         const text = await this.m_loader(this.m_currentFrame);
-        this.m_objectList = [];
-        this.m_objectRTree.clear();
+        this.cmdClear();
         const objlist = JSON.parse(text);
         for (let obj of objlist) {
             const drawItem = new DrawItem(obj.type)
@@ -883,7 +934,7 @@ fullviewport.addEventListener('mousedown', (e) => {
         enterSelectionMode({x: e.offsetX, y: e.offsetY});
     }
 });
-fullviewport.addEventListener('mouseleave', (e) => {
+fullviewport.addEventListener('mouseleave', () => {
     leaveDragMode();
     leaveSelectionMode();
 });
@@ -898,6 +949,67 @@ fullviewport.addEventListener('mouseup', (e) => {
 fullviewport.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     e.stopPropagation();
+});
+
+function hideInputBar() {
+    inputBar.classList.remove("input-bar-show");
+}
+function showInputBar() {
+    inputBar.classList.add("input-bar-show");
+    commandLineBar.focus();
+    commandLineBar.value = "";
+}
+
+commandLineBar.addEventListener("keydown", e => {
+    e.stopPropagation();
+});
+const commandHistory = [];
+let historyIndex = -1;
+let tempCommand = '';
+commandLineBar.addEventListener("keyup", e => {
+    e.stopPropagation();
+    if (e.key == 'Escape') {
+        hideInputBar();
+    } else if (e.key == 'Enter') {
+        viewport.executeCommand(commandLineBar.value.trim());
+        commandHistory.push(commandLineBar.value.trim());
+        hideInputBar();
+    } else if (e.key == 'ArrowUp') {
+        if (historyIndex == -1 && commandHistory.length > 0) {
+            historyIndex = commandHistory.length - 1;
+            tempCommand = commandLineBar.value;
+            commandLineBar.value = commandHistory[historyIndex];
+        } else if (historyIndex > 0) {
+            if (commandLineBar.value != commandHistory[historyIndex]) {
+                tempCommand = commandLineBar.value;
+            }
+            historyIndex--;
+            commandLineBar.value = commandHistory[historyIndex];
+        }
+    } else if (e.key == 'ArrowDown') {
+        if (historyIndex >= 0) {
+            if (historyIndex + 1 == commandHistory.length) {
+                historyIndex = -1;
+                commandLineBar.value = tempCommand;
+            } else {
+                if (commandLineBar.value != commandHistory[historyIndex]) {
+                    tempCommand = commandLineBar.value;
+                }
+                historyIndex++;
+                commandLineBar.value = commandHistory[historyIndex];
+            }
+        }
+    }
+});
+
+window.addEventListener("keyup", (e) => {
+    if (e.key == 'c') {
+        showInputBar();
+        historyIndex = -1;
+        tempCommand = '';
+    } else if (e.key == 'Escape') {
+        hideInputBar();
+    }
 });
 
 async function setupConnection()
@@ -921,12 +1033,23 @@ async function setupConnection()
     updateProgress();
     updatePlayIcon();
 
-    setInterval(async () => {
+    framePerSec.addEventListener("change", () => {
+        framePerSecondValue = framePerSec.valueAsNumber;
+    });
+    let framePerSecondValue = 1;
+    let prevFresh = Date.now();
+    while (true) {
+        const now = Date.now();
+        const nextTimeout = Math.max(0, prevFresh + 1000 / framePerSecondValue - now);
+        await new Promise(r => setTimeout(r, nextTimeout));
+        prevFresh = Date.now();
         if (!viewport.paused) {
-            await viewport.setFrame(viewport.currentFrame+1);
-            updateProgress();
+            try {
+                await viewport.setFrame(viewport.currentFrame+1);
+                updateProgress();
+            } catch {}
         }
-    }, 1000)
+    };
 }
 
 setupConnection();

@@ -96,6 +96,52 @@ canvas.selection {
     justify-content: space-between;
     align-items: center;
     padding: 10px;
+    position: relative;
+}
+
+.tools #input-bar {
+    width: 80%;
+    height: 2em;
+    position: absolute;
+    background: rgb(45 68 108 / 30%);
+    bottom: 120%;
+    left: 10%;
+    border-radius: 0.5em;
+    z-index: 99;
+    display: none;
+}
+
+.tools #input-bar.input-bar-show {
+    display: block;
+}
+
+.tools #input-bar input {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    outline: none;
+    border: 0em;
+    padding: 0em 1em;
+    color: white;
+    caret-color: white;
+}
+
+.tools #error-bar {
+    width: 80%;
+    height: 1em;
+    position: absolute;
+    background: transparent;
+    color: red;
+    bottom: 120%;
+    left: 10%;
+    border-radius: 0.5em;
+    text-align: center;
+    z-index: 100;
+    display: none;
+}
+
+.tools #error-bar.error-bar-show {
+    display: block;
 }
 
 .tools .coordx {
@@ -137,6 +183,13 @@ canvas.selection {
     border: 0;
     background: transparent;
     cursor: pointer;
+}
+
+.controls #frame-per-second {
+    height: 100%;
+    width: 3em;
+    text-align: center;
+    margin: 0em 1em;
 }
 
 .controls .fa-play {
