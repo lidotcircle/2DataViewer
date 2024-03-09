@@ -171,6 +171,9 @@ if __name__ == "__main__":
         n = openInput.readline().strip()
         if n == '':
             break
+        frameOffset.append(off)
+        if (len(frameOffset) > 1):
+            continue
         try:
             shapes = parse_tokens(tokenize(n))
             for s in shapes:
@@ -192,6 +195,5 @@ if __name__ == "__main__":
                         mergePoint(pt)
         except:
             pass
-        frameOffset.append(off)
 
     run(host=args.host, port=args.port)
