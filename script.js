@@ -304,7 +304,6 @@ class DrawItem {
 
     constructor(type) {
         this.type = type;
-        this.color = "rgba(99, 99, 99, 0.99)";;
     }
 
     setColor(color) {
@@ -343,6 +342,25 @@ function showError(msg)
     setTimeout(() => errorBar.classList.remove("error-bar-show"), 2000);
 }
 
+function splitString(input)
+{
+  const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/g;
+  const result = [];
+  let match;
+
+  while ((match = regex.exec(input)) !== null) {
+    if (match[1]) {
+      result.push(match[1]);
+    } else if (match[2]) {
+      result.push(match[2]);
+    } else {
+      result.push(match[0]);
+    }
+  }
+
+  return result;
+}
+
 const RTREE_ITEM_ID = Symbol("RTREE_ITEM_ID");
 class Viewport
 {
@@ -355,12 +373,23 @@ class Viewport
 		this.m_transform = AffineTransformation.identity();
         this.m_objectList = [];
         this.m_objectRTree = rbush();
+        this.m_viewportConfig = {
+            "default_width": 1,
+            "default_color": "rgba(99, 99, 99, 0.99)",
+            "default_background": "#2c2929",
+        };
         window.addEventListener("resize", () => this.fitCanvas());
         this.fitCanvas();
     }
 
     addDrawingObject(obj) {
         this.m_objectList.push(obj);
+        if (obj.color == null) {
+            obj.color = this.m_viewportConfig.default_color;
+        }
+        if ((obj.type == 'cline' || obj.type == 'line') && obj.width == null) {
+            obj.width = this.m_viewportConfig.default_width;
+        }
         const box = obj.getBox();
         const item = {
             minX: box.getBL().x,
@@ -437,18 +466,66 @@ class Viewport
         this.m_objectRTree.clear();
     }
 
+    cmdSet(args) {
+        const argv = splitString(args);
+        if (argv.length == 0) {
+            showError("set nothing");
+            return;
+        }
+
+        if (argv[0] == 'color') {
+            if (argv.length != 2) {
+                showError("fail to set default color");
+                return;
+            }
+            this.m_viewportConfig.default_color = argv[1];
+        } else if (argv[0] == 'background') {
+            if (argv.length != 2) {
+                showError("fail to set default background");
+                return;
+            }
+            this.m_viewportConfig.default_background = argv[1];
+            this.m_viewportEl.style.background = argv[1];
+        } else if (argv[0] == 'width') {
+            if (argv.length != 2) {
+                showError("fail to set default width");
+                return;
+            }
+            this.m_viewportConfig.default_width = argv[1];
+        } else {
+            showError(`set nothing '${argv[0]}'`);
+        }
+    }
+
     cmdDraw(args) {
         let addn = 0;
-        try {
-            const tokens = tokenize(args);
-            const items = parseTokens(tokens);
-            for (let item of items) {
-                const drawItem = new DrawItem(item.type)
-                Object.assign(drawItem, item);
+        const kregex = /\s*[({]\s*(?:x\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*,\s*(?:y\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*[})]/g;
+        const pts = [];
+        let match;
+        while ((match = kregex.exec(args)) !== null) {
+            pts.push({ x: parseInt(match[1]), y: parseInt(match[2]) });
+        }
+
+        if (pts.length > 1) {
+            for (let i=0;i+1<pts.length;i++) {
+                const drawItem = new DrawItem("cline")
+                drawItem.point1 = pts[i];
+                drawItem.point2 = pts[i+1];
                 this.addDrawingObject(drawItem);
                 addn++;
             }
-        } catch (err) { showError(err); }
+        } else {
+            try {
+                const tokens = tokenize(args);
+                const items = parseTokens(tokens);
+                for (let item of items) {
+                    const drawItem = new DrawItem(item.type)
+                    Object.assign(drawItem, item);
+                    this.addDrawingObject(drawItem);
+                    addn++;
+                }
+            } catch (err) { showError(err); }
+        }
         if (addn > 0) {
             this.refreshDrawingCanvas();
         }
@@ -464,6 +541,8 @@ class Viewport
             this.clearSelection();
         } else if (c === 'zoom') {
             this.cmdZoom();
+        } else if (c === 'set') {
+            this.cmdSet(cmd.substr(4));
         }else {
             showError(`cann't not execute '${cmd}'`);
         }
@@ -805,7 +884,6 @@ class Viewport
     m_currentFrame = 0;
     m_totalFrames = 30;
     m_loader;
-    m_defaultColor = "rgba(18, 18, 18, 0.8)";
     m_transform;
     m_viewportEl;
     m_objectList;
@@ -960,13 +1038,13 @@ function showInputBar() {
     commandLineBar.value = "";
 }
 
-commandLineBar.addEventListener("keydown", e => {
+commandLineBar.addEventListener("keyup", e => {
     e.stopPropagation();
 });
 const commandHistory = [];
 let historyIndex = -1;
 let tempCommand = '';
-commandLineBar.addEventListener("keyup", e => {
+commandLineBar.addEventListener("keydown", e => {
     e.stopPropagation();
     if (e.key == 'Escape') {
         hideInputBar();
@@ -974,7 +1052,7 @@ commandLineBar.addEventListener("keyup", e => {
         viewport.executeCommand(commandLineBar.value.trim());
         commandHistory.push(commandLineBar.value.trim());
         hideInputBar();
-    } else if (e.key == 'ArrowUp') {
+    } else if (e.key == 'ArrowUp' || (e.key == 'p' && e.ctrlKey)) {
         if (historyIndex == -1 && commandHistory.length > 0) {
             historyIndex = commandHistory.length - 1;
             tempCommand = commandLineBar.value;
@@ -986,6 +1064,7 @@ commandLineBar.addEventListener("keyup", e => {
             historyIndex--;
             commandLineBar.value = commandHistory[historyIndex];
         }
+        e.preventDefault();
     } else if (e.key == 'ArrowDown') {
         if (historyIndex >= 0) {
             if (historyIndex + 1 == commandHistory.length) {
@@ -1009,6 +1088,8 @@ window.addEventListener("keyup", (e) => {
         tempCommand = '';
     } else if (e.key == 'Escape') {
         hideInputBar();
+    } else if (e.key == ' ') {
+        toggleViewportStatus();
     }
 });
 
