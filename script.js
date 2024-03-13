@@ -31,6 +31,21 @@ class AffineTransformation {
 
     static identity() { return new AffineTransformation(1, 0, 0, 1, 0, 0); }
 
+    static rotate(angle) {
+        return new AffineTransformation(
+            Math.cos(angle), Math.sin(angle),
+            -Math.sin(angle), Math.cos(angle),
+            0, 0);
+    }
+
+    static translate(tx, ty) {
+        return new AffineTransformation(1, 0, 0, 1, tx, ty);
+    }
+
+    static scale(sx, sy) {
+        return new AffineTransformation(sx, 0, 0, sy, 0, 0);
+    }
+
     concat(other) {
         const a = this.a * other.a + this.b * other.c;
         const b = this.a * other.b + this.b * other.d;
@@ -66,6 +81,11 @@ class AffineTransformation {
         const y = newC * point.x + newD * point.y + newTy;
 
         return { x, y };
+    }
+
+    convertToDOMMatrix()
+    {
+        return new DOMMatrix([this.a, this.b, this.c, this.d, this.tx, this.ty]);
     }
 }
 
@@ -141,6 +161,57 @@ function Box2boxTransformation(box1, box2)
     return new AffineTransformation(1, 0, 0, 1, c2.x, c2.y)
         .concat(new AffineTransformation(s * 0.95, 0, 0, s * 0.95, 0, 0))
         .concat(new AffineTransformation(1, 0, 0, 1, -c1.x, -c1.y));
+}
+
+function invertColor(color) {
+    // Convert named colors to hexadecimal
+    const colors = {
+        "black": "#000000",
+        "white": "#ffffff",
+        "red": "#ff0000",
+        "lime": "#00ff00",
+        "blue": "#0000ff",
+        "yellow": "#ffff00",
+        "cyan": "#00ffff",
+        "magenta": "#ff00ff",
+        "silver": "#c0c0c0",
+        "gray": "#808080",
+        "maroon": "#800000",
+        "olive": "#808000",
+        "green": "#008000",
+        "purple": "#800080",
+        "teal": "#008080",
+        "navy": "#000080",
+        // Add more named colors if needed
+    };
+
+    if (colors[color.toLowerCase()]) {
+        color = colors[color.toLowerCase()];
+    }
+
+    // Convert hex format to RGB
+    if (color[0] === "#") {
+        color = color.slice(1); // Remove '#'
+        if (color.length === 3) {
+            color = color[0] + color[0] + color[1] + color[1] + color[2] + color[2]; // Convert 3-digit hex to 6-digit
+        }
+        const r = parseInt(color.substr(0, 2), 16);
+        const g = parseInt(color.substr(2, 2), 16);
+        const b = parseInt(color.substr(4, 2), 16);
+        color = `rgb(${r},${g},${b})`; // Convert to RGB
+    }
+
+    // Invert RGB (and optionally RGBA)
+    if (color.includes("rgba")) {
+        let [r, g, b, a] = color.match(/\d+/g).map(Number);
+        return `rgba(${255 - r},${255 - g},${255 - b},${a})`;
+    } else if (color.includes("rgb")) {
+        let [r, g, b] = color.match(/\d+/g).map(Number);
+        return `rgb(${255 - r},${255 - g},${255 - b})`;
+    }
+
+    // If the format is not recognized, return the original
+    return color;
 }
 
 function findLineSegmentIntersection(A, B, C, D) {
@@ -367,8 +438,11 @@ class Viewport
     constructor(canvasId)
     {
         this.m_viewportEl = document.getElementById(canvasId)
+        /** @type HTMLCanvasElement */
         this.m_canvas = this.m_viewportEl.querySelector("canvas.drawing");
+        /** @type HTMLCanvasElement */
         this.m_selectionBox = this.m_viewportEl.querySelector("canvas.selection");
+        /** @type HTMLCanvasElement */
         this.m_coordinationBox = this.m_viewportEl.querySelector("canvas.coordination");
 		this.m_transform = AffineTransformation.identity();
         this.m_objectList = [];
@@ -548,6 +622,44 @@ class Viewport
         }
     }
 
+    /**
+     * @param ctx { CanvasRenderingContext2D }
+     * @param from { {x: float, y: float } }
+     * @param to { {x: float, y: float } }
+     * @param height { float }
+     * @param text { string }
+     * @param ratio { float }
+     * @param ignoreLength { boolean }
+     */
+    static drawTextAtLine(ctx, from, to, height, text, ratio, ignoreLength)
+    {
+        ctx.save();
+        ctx.textBaseline = "bottom";
+        const expectedHeight = height;
+        ctx.font = "48px serif";
+        const m = ctx.measureText(text);
+        const c = PointAdd(from, to);
+        const diff = PointSub(from, to);
+        const atanv = Math.atan(diff.y / (diff.x == 0 ? 1 : diff.x));
+        const angle = diff.x == 0 ? (diff.y > 0 ? Math.PI / 2 : Math.PI * 1.5) : (diff.x > 0 ? atanv : atanv + Math.PI);
+        const textheight = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+        const len = Math.sqrt(diff.x * diff.x + diff.y * diff.y);
+        const s = Math.min(ignoreLength ? expectedHeight /textheight : len / m.width, expectedHeight / textheight) * ratio;
+        const t = 
+            AffineTransformation.translate(c.x / 2, c.y / 2)
+                .concat(AffineTransformation.rotate(-angle))
+                .concat(AffineTransformation.scale(s, s))
+                .concat(AffineTransformation.translate(-m.width/2, -textheight/2))
+                .concat(new AffineTransformation(1, 0, 0, -1, 0, 0));
+        ctx.setTransform(ctx.getTransform().multiply(t.convertToDOMMatrix()));
+        ctx.fillText(text, 0, 0);
+        ctx.restore();
+    }
+
+    /**
+     * @param ctx { CanvasRenderingContext2D }
+     * @param item { DrawItem }
+     */
     static drawItemInCanvas(ctx, item) {
         if (item.type == "line") {
             ctx.strokeStyle = item.color;
@@ -605,8 +717,7 @@ class Viewport
         ctx.clearRect(0, 0, this.m_canvas.width, this.m_canvas.height);
 
         const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
-        const t = baseTrans.concat(this.m_transform);
-        ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
+        ctx.setTransform(baseTrans.concat(this.m_transform).convertToDOMMatrix());
         for (let item of this.m_objectList) {
             Viewport.drawItemInCanvas(ctx, item);
         }
