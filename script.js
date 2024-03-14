@@ -483,7 +483,7 @@ class Viewport
         if (idx != -1) {
             this.m_objectList.splice(idx, 1);
             const item = obj[RTREE_ITEM_ID];
-            if (item == null) {
+            if (item != null) {
                 this.m_objectRTree.remove(item);
             }
         }
@@ -830,6 +830,15 @@ class Viewport
         this.refreshSelection();
     }
 
+    RemoveSelectedItems() {
+        for (let obj of this.m_selectedItems) {
+            this.removeDrawingObject(obj['object']);
+        }
+        this.m_selectedItems = [];
+        this.refreshSelection();
+        this.refreshDrawingCanvas();
+    }
+
     refreshSelection() {
         let ctx = this.m_selectedItemsCanvas.getContext("2d");
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -837,7 +846,6 @@ class Viewport
         const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
         const t = baseTrans.concat(this.m_transform);
         ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
-        console.log(this.m_selectedItems);
         for (let item of this.m_selectedItems) {
             const obj = item["object"];
             const oldColor = obj.color;
@@ -1232,7 +1240,11 @@ window.addEventListener("keyup", (e) => {
         historyIndex = -1;
         tempCommand = '';
     } else if (e.key == 'Escape') {
+        viewport.clearSelection();
+        viewport.drawSelectedItem();
         hideInputBar();
+    } else if (e.key == 'Delete') {
+        viewport.RemoveSelectedItems();
     } else if (e.key == ' ') {
         toggleViewportStatus();
     }
