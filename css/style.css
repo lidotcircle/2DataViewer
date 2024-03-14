@@ -53,6 +53,7 @@ body {
     border-top-left-radius: 0px;
     border-top-right-radius: 0px;
     overflow: hidden;
+    outline: none;
 }
 
 .screen.drag-mode {
@@ -82,6 +83,10 @@ canvas.drawing {
     
 canvas.selection {
     z-index: 3;
+}
+
+canvas.selection-box {
+    z-index: 4;
 }
 
 .tools {

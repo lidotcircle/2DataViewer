@@ -278,7 +278,7 @@ function parseTokens(tokens) {
                 }
             } else if (key === 'radius' || key === 'width') {
                 shape[key] = parseFloat(nextToken());
-            } else if (key === 'color') {
+            } else if (key === 'color' || key === 'comment' || key === 'layer') {
                 shape[key] = nextToken().replace(/"/g, '');
             }
             nextToken();
@@ -441,7 +441,9 @@ class Viewport
         /** @type HTMLCanvasElement */
         this.m_canvas = this.m_viewportEl.querySelector("canvas.drawing");
         /** @type HTMLCanvasElement */
-        this.m_selectionBox = this.m_viewportEl.querySelector("canvas.selection");
+        this.m_selectionBox = this.m_viewportEl.querySelector("canvas.selection-box");
+        /** @type HTMLCanvasElement */
+        this.m_selectedItemsCanvas = this.m_viewportEl.querySelector("canvas.selection");
         /** @type HTMLCanvasElement */
         this.m_coordinationBox = this.m_viewportEl.querySelector("canvas.coordination");
 		this.m_transform = AffineTransformation.identity();
@@ -642,12 +644,12 @@ class Viewport
         const diff = PointSub(from, to);
         const atanv = Math.atan(diff.y / (diff.x == 0 ? 1 : diff.x));
         const angle = diff.x == 0 ? (diff.y > 0 ? Math.PI / 2 : Math.PI * 1.5) : (diff.x > 0 ? atanv : atanv + Math.PI);
-        const textheight = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+        const textheight = m.actualBoundingBoxAscent - m.actualBoundingBoxDescent;
         const len = Math.sqrt(diff.x * diff.x + diff.y * diff.y);
         const s = Math.min(ignoreLength ? expectedHeight /textheight : len / m.width, expectedHeight / textheight) * ratio;
         const t = 
             AffineTransformation.translate(c.x / 2, c.y / 2)
-                .concat(AffineTransformation.rotate(-angle))
+                .concat(AffineTransformation.rotate(-angle + Math.PI))
                 .concat(AffineTransformation.scale(s, s))
                 .concat(AffineTransformation.translate(-m.width/2, -textheight/2))
                 .concat(new AffineTransformation(1, 0, 0, -1, 0, 0));
@@ -668,12 +670,20 @@ class Viewport
             path.lineTo(item.point1.x, item.point1.y);
             path.lineTo(item.point2.x, item.point2.y);
             ctx.stroke(path);
+            if (item.comment) {
+                ctx.fillStyle = 'white';
+                this.drawTextAtLine(ctx, item.point1, item.point2, item.width, item.comment, 0.95, false);
+            }
         } else if (item.type == "circle") {
             ctx.fillStyle = item.color;
             const path = new Path2D();
             path.ellipse(item.center.x, item.center.y, item.radius,
                 item.radius, 0, 0, 360);;
             ctx.fill(path);
+            if (item.comment) {
+                ctx.fillStyle = 'white';
+                this.drawTextAtLine(ctx, PointSub(item.center, {x: item.radius*0.6, y:0}), PointAdd(item.center, {x: item.radius*0.6, y:0}), item.radius * 1.2, item.comment, 0.95, false);
+            }
         } else if (item.type == "cline") {
             ctx.strokeStyle = item.color;
             ctx.lineWidth = item.width;
@@ -697,6 +707,10 @@ class Viewport
                     item.width / 2, 0, 0, 360);;
                 ctx.fill(path);
             }
+            if (item.comment) {
+                ctx.fillStyle = 'white';
+                this.drawTextAtLine(ctx, item.point1, item.point2, item.width, item.comment, 0.95, false);
+            }
         } else if (item.type == "polygon") {
             ctx.fillStyle = item.color;
             {
@@ -708,7 +722,6 @@ class Viewport
                 ctx.fill(path);
             }
         }
-
     }
 
     refreshDrawingCanvas() {
@@ -798,21 +811,34 @@ class Viewport
         ctx.stroke(path);
         this.m_selectionStart = start;
         this.m_selectionTo = to;
+        this.m_selectedItems = [];
         this.drawSelectedItem(this.m_selectionStart, this.m_selectionTo);
     }
 
     drawSelectedItem(start, to) {
-        if (start == null || to == null) return;
-        let ctx = this.m_selectionBox.getContext("2d");
+        if (start == null || to == null) {
+            this.m_selectedItems = [];
+        } else {
+            const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
+            const t = baseTrans.concat(this.m_transform);
+            const box = new BoundingBox(t.revertXY(start), t.revertXY(to));
+            this.m_selectedItems = this.m_objectRTree.search({
+                minX: box.getBL().x, minY: box.getBL().y,
+                maxX: box.getTR().x, maxY: box.getTR().y
+            });
+        }
+        this.refreshSelection();
+    }
+
+    refreshSelection() {
+        let ctx = this.m_selectedItemsCanvas.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.m_selectedItemsCanvas.width, this.m_selectedItemsCanvas.height);
         const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
         const t = baseTrans.concat(this.m_transform);
-        const box = new BoundingBox(t.revertXY(start), t.revertXY(to));
-        const itemList = this.m_objectRTree.search({
-            minX: box.getBL().x, minY: box.getBL().y,
-            maxX: box.getTR().x, maxY: box.getTR().y
-        });
         ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
-        for (let item of itemList) {
+        console.log(this.m_selectedItems);
+        for (let item of this.m_selectedItems) {
             const obj = item["object"];
             const oldColor = obj.color;
             try {
@@ -837,6 +863,8 @@ class Viewport
         this.m_canvas.height = this.m_viewportEl.clientHeight;
         this.m_selectionBox.width = this.m_viewportEl.clientWidth;
         this.m_selectionBox.height = this.m_viewportEl.clientHeight;
+        this.m_selectedItemsCanvas.width = this.m_viewportEl.clientWidth;
+        this.m_selectedItemsCanvas.height = this.m_viewportEl.clientHeight;
         this.m_coordinationBox.width = this.m_viewportEl.clientWidth;
         this.m_coordinationBox.height = this.m_viewportEl.clientHeight;
         this.refreshDrawingCanvas();
@@ -892,31 +920,37 @@ class Viewport
     {
         this.scale(1.1, 1.1, X, Y);
         this.refreshDrawingCanvas();
+        this.refreshSelection();
     }
     scaleDown(X, Y)
     {
         this.scale(1/1.1, 1/1.1, X, Y);
         this.refreshDrawingCanvas();
+        this.refreshSelection();
     }
     moveLeft()
     {
         this.translate(-50, 0);
         this.refreshDrawingCanvas(); 
+        this.refreshSelection();
     }
     moveRight()
     {
         this.translate(50, 0);
         this.refreshDrawingCanvas(); 
+        this.refreshSelection();
     }
     moveUp()
     {
         this.translate(0, 50);
         this.refreshDrawingCanvas(); 
+        this.refreshSelection();
     }
     moveDown()
     {
         this.translate(0, -50);
         this.refreshDrawingCanvas(); 
+        this.refreshSelection();
     }
 
     scale(scaleX, scaleY, _X, _Y)

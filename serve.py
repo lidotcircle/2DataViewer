@@ -36,7 +36,7 @@ def parse_tokens(tokens):
                     value = {'x': x, 'y': y}
                 elif key in ['radius', 'width']:
                     value = float(next_token())
-                elif key == 'color':
+                elif key in ['color', 'comment', 'layer']:
                     value = next_token().strip('"')
                 next_token()  # Consume ')'
                 if shape["type"] == "polygon" and key == "point":
