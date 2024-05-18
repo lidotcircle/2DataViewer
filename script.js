@@ -575,11 +575,11 @@ class Viewport
 
     cmdDraw(args) {
         let addn = 0;
-        const kregex = /\s*[({]\s*(?:x\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*,\s*(?:y\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*[})]/g;
+        const kregex = /\s*([a-zA-Z0-9]*\s*=\s*)?[({]\s*(?:m?_?x\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*,\s*(?:m?_?y\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*[})]/g;
         const pts = [];
         let match;
         while ((match = kregex.exec(args)) !== null) {
-            pts.push({ x: parseInt(match[1]), y: parseInt(match[2]) });
+            pts.push({ x: parseInt(match[2]), y: parseInt(match[3]) });
         }
 
         if (pts.length > 1) {
@@ -1195,6 +1195,10 @@ commandLineBar.addEventListener("keyup", e => {
     e.stopPropagation();
 });
 const commandHistory = [];
+const localstorage = window.localStorage;
+if (localstorage.getItem("commandHistory")) {
+    commandHistory.push(...JSON.parse(localstorage.getItem("commandHistory")));
+}
 let historyIndex = -1;
 let tempCommand = '';
 commandLineBar.addEventListener("keydown", e => {
@@ -1204,6 +1208,7 @@ commandLineBar.addEventListener("keydown", e => {
     } else if (e.key == 'Enter') {
         viewport.executeCommand(commandLineBar.value.trim());
         commandHistory.push(commandLineBar.value.trim());
+        localstorage.setItem("commandHistory", JSON.stringify(commandHistory));
         hideInputBar();
     } else if (e.key == 'ArrowUp' || (e.key == 'p' && e.ctrlKey)) {
         if (historyIndex == -1 && commandHistory.length > 0) {
