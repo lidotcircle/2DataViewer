@@ -1239,11 +1239,19 @@ commandLineBar.addEventListener("keydown", e => {
     }
 });
 
-window.addEventListener("keyup", (e) => {
+window.addEventListener("keyup", async (e) => {
     if (e.key == 'c') {
         showInputBar();
         historyIndex = -1;
         tempCommand = '';
+    } else if (e.key == 'ArrowLeft') {
+        if (viewport.currentFrame > 0) {
+            await viewport.setFrame(viewport.currentFrame-1);
+            updateProgress();
+        }
+    } else if (e.key == 'ArrowRight') {
+        await viewport.setFrame(viewport.currentFrame+1);
+        updateProgress();
     } else if (e.key == 'Escape') {
         viewport.clearSelection();
         viewport.drawSelectedItem();
