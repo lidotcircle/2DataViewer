@@ -713,13 +713,29 @@ class Viewport
             }
         } else if (item.type == "polygon") {
             ctx.fillStyle = item.color;
+            let pointSum = {x: 0, y: 0};
             {
                 const path = new Path2D();
                 for (let p of item.points) {
                     path.lineTo(p.x, p.y);
+                    pointSum.x += p.x;
+                    pointSum.y += p.y;
                 }
                 path.closePath();
                 ctx.fill(path);
+            }
+            if (item.comment) {
+                const center = {x: pointSum.x / item.points.length, y: pointSum.y / item.points.length};
+                let rsum = 0;
+                for (let p of item.points) {
+                    const vec = PointSub(center, p);
+                    rsum += Math.sqrt(vec.x * vec.x);
+                }
+                const radius = rsum / item.points.length;
+                if (radius > 1) {
+                    ctx.fillStyle = 'white';
+                    this.drawTextAtLine(ctx, PointSub(center, {x: radius*0.6, y:0}), PointAdd(center, {x: radius*0.6, y:0}), radius * 1.2, item.comment, 0.95, false);
+                }
             }
         }
     }
