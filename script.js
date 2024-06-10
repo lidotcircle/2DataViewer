@@ -1,6 +1,7 @@
 const play = document.getElementById('play');
 const stop = document.getElementById('stop');
 const framePerSec = document.getElementById('frame-per-second');
+const currentFrame = document.getElementById('current-frame');
 const commandLineBar = document.getElementById('command-line-input');
 const inputBar = document.getElementById('input-bar');
 const errorBar = document.getElementById('error-bar');
@@ -16,6 +17,9 @@ const moveRight = document.getElementById('move-right');
 const moveUp = document.getElementById('move-up');
 const moveDown = document.getElementById('move-down');
 const cursorCoordination = document.getElementById('cursor-coordination');
+const objectDetailText = document.getElementById('object-detail-text');
+const objectDetailCount = document.getElementById('object-detail-count');
+const objectDetail = document.getElementById('object-detail');
 
 import { Point, Segment, Circle, Polygon } from './flatten.js';
 
@@ -794,7 +798,6 @@ class Viewport
     }
 
     refreshDrawingCanvas() {
-        this.drawSelectedItem(null, null);
         let ctx = this.m_canvas.getContext("2d");
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.m_canvas.width, this.m_canvas.height);
@@ -888,6 +891,8 @@ class Viewport
     drawSelectedItem(start, to) {
         if (start == null || to == null) {
             this.m_selectedItems = [];
+            objectDetailText.innerText = "";
+            objectDetailCount.innerText = "0";
         } else {
             const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
             const t = baseTrans.concat(this.m_transform);
@@ -904,6 +909,7 @@ class Viewport
                 maxX: box.getTR().x, maxY: box.getTR().y
             });
             this.m_selectedItems = [];
+            const objects = [];
             for (let item of rtreeCollide) {
                 const distance = polygon.distanceTo(item.object.shape());
                 const mindis = item.object.width || 0;
@@ -912,7 +918,19 @@ class Viewport
                      (item.object.type == "polygon" && item.object.shape().contains(polygon)))
                 {
                     this.m_selectedItems.push(item);
+                    objects.push(item.object);
                 }
+            }
+            if (objects.length == 0) {
+                objectDetailText.innerText = "";
+                objectDetailCount.innerText = "0";
+            } else {
+                objectDetailCount.innerText = objects.length;
+                objectDetailText.innerText = JSON.stringify(objects,
+                    (key, value) => {
+                        if (key=="m_shape") return undefined;
+                        else return value;
+                    }, 2);
             }
         }
         this.refreshSelection();
@@ -1089,6 +1107,12 @@ class Viewport
     async setFrame(n)
     {
         if (n > this.m_totalFrames - 1) return;
+
+        if (currentFrame.valueAsNumber != n + 1) {
+            currentFrame.valueAsNumber = n + 1;
+        }
+
+        this.drawSelectedItem(null, null);
         this.m_currentFrame = Math.max(Math.min(n, this.m_totalFrames - 1), 0);
         const text = await this.m_loader(this.m_currentFrame);
         this.cmdClear();
@@ -1348,6 +1372,8 @@ window.addEventListener("keyup", async (e) => {
         viewport.RemoveSelectedItems();
     } else if (e.key == ' ') {
         toggleViewportStatus();
+    } else if (e.key == 'i' && e.ctrlKey) {
+        objectDetail.classList.toggle("object-detail-show");
     }
 });
 
@@ -1374,6 +1400,10 @@ async function setupConnection()
 
     framePerSec.addEventListener("change", () => {
         framePerSecondValue = framePerSec.valueAsNumber;
+    });
+    currentFrame.addEventListener("change", () => {
+        viewport.setFrame(currentFrame.valueAsNumber-1);
+        updateProgress();
     });
     let framePerSecondValue = 1;
     let prevFresh = Date.now();

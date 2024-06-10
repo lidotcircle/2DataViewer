@@ -10,7 +10,11 @@
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <div class="object-viewer">
+    <div id="object-viewer">
+      <div id="object-detail">
+        <div id="object-detail-count"></div>
+        <pre><span id="object-detail-text"></span></pre>
+      </div>
     </div>
     <div class="object-filter">
     </div>
@@ -62,6 +66,7 @@
           <i class="fa fa-stop fa-2x"></i>
         </button>
         <input id="frame-per-second" type="number" value="1" min="1" max="60"/>
+        <input id="current-frame" type="number" value="1" min="1"/>
         <input
         type="range"
         id="progress"
