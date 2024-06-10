@@ -7,7 +7,6 @@ const errorBar = document.getElementById('error-bar');
 const progress = document.getElementById('progress');
 const timestamp = document.getElementById('timestamp');
 const fullviewport = document.getElementById('fullviewport');
-const screenviewport = document.getElementById('viewport');
 const fitScreen = document.getElementById('fit-screen');
 const reset = document.getElementById('reset');
 const scaleUp = document.getElementById('scale-up');
@@ -18,6 +17,7 @@ const moveUp = document.getElementById('move-up');
 const moveDown = document.getElementById('move-down');
 const cursorCoordination = document.getElementById('cursor-coordination');
 
+import { Point, Segment, Circle, Polygon } from './flatten.js';
 
 class AffineTransformation {
     constructor(a, b, c, d, tx, ty) {
@@ -346,6 +346,22 @@ function PointSub(p1, p2)
     return {x: p1.x - p2.x, y: p1.y - p2.y };
 }
 
+function toPoint(p) {
+    return new Point(p.x, p.y);
+}
+function sanitizePoints(obj) {
+    for (let key in obj) {
+        const v = obj[key];
+        if (typeof v === 'object') {
+            if (v.x != null && v.y != null) {
+                obj[key] = toPoint(v);
+            } else {
+                sanitizePoints(v);
+            }
+        }
+    }
+}
+
 class DrawItem {
     static CreateCircle(center, radius) {
         let ans = new DrawItem("circle");
@@ -403,6 +419,32 @@ class DrawItem {
         } else {
             return null;
         }
+    }
+
+    shape() {
+        if (this.m_shape != null) {
+            return this.m_shape;
+        }
+
+        sanitizePoints(this);
+        switch (this.type) {
+            case "circle":
+                this.m_shape = new Circle(toPoint(this.center), this.radius);
+                break;
+            case "line":
+                this.m_shape = new Segment(toPoint(this.point1), toPoint(this.point2));
+                break;
+            case "cline":
+                this.m_shape = new Segment(toPoint(this.point1), toPoint(this.point2));
+                break;
+            case "polygon":
+                this.m_shape = new Polygon(this.points);
+                break;
+            default:
+                this.m_shape = null;
+                break;
+        }
+        return this.m_shape;
     }
 }
 
@@ -726,12 +768,23 @@ class Viewport
             }
             if (item.comment) {
                 const center = {x: pointSum.x / item.points.length, y: pointSum.y / item.points.length};
-                let rsum = 0;
+                let rsumx = 0, rsumy = 0;
                 for (let p of item.points) {
                     const vec = PointSub(center, p);
-                    rsum += Math.sqrt(vec.x * vec.x);
+                    rsumx += Math.sqrt(vec.x * vec.x);
+                    rsumy += Math.sqrt(vec.y * vec.y);
                 }
-                const radius = rsum / item.points.length;
+                const ravgx = rsumx / item.points.length;
+                const ravgy = rsumy / item.points.length;
+                let qsumx = 0, qsumy = 0;
+                for (let p of item.points) {
+                    const vec = PointSub(center, p);
+                    qsumx += Math.pow(Math.sqrt(vec.x * vec.x) - ravgx, 2);
+                    qsumy += Math.pow(Math.sqrt(vec.y * vec.y) - ravgy, 2);
+                }
+                const qavgx = Math.sqrt(qsumx / item.points.length);
+                const qavgy = Math.sqrt(qsumy / item.points.length);
+                const radius = Math.min(ravgx - 0.5 * qavgx, ravgy - 0.5 * qavgy);
                 if (radius > 1) {
                     ctx.fillStyle = 'white';
                     this.drawTextAtLine(ctx, PointSub(center, {x: radius*0.6, y:0}), PointAdd(center, {x: radius*0.6, y:0}), radius * 1.2, item.comment, 0.95, false);
@@ -741,6 +794,7 @@ class Viewport
     }
 
     refreshDrawingCanvas() {
+        this.drawSelectedItem(null, null);
         let ctx = this.m_canvas.getContext("2d");
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.m_canvas.width, this.m_canvas.height);
@@ -838,10 +892,28 @@ class Viewport
             const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
             const t = baseTrans.concat(this.m_transform);
             const box = new BoundingBox(t.revertXY(start), t.revertXY(to));
-            this.m_selectedItems = this.m_objectRTree.search({
+            const bn = box.inflate(1);
+            const polygon = new Polygon([
+                new Point(bn.minX, bn.minY),
+                new Point(bn.maxX, bn.minY),
+                new Point(bn.maxX, bn.maxY),
+                new Point(bn.minX, bn.maxY)
+            ]);
+            const rtreeCollide = this.m_objectRTree.search({
                 minX: box.getBL().x, minY: box.getBL().y,
                 maxX: box.getTR().x, maxY: box.getTR().y
             });
+            this.m_selectedItems = [];
+            for (let item of rtreeCollide) {
+                const distance = polygon.distanceTo(item.object.shape());
+                const mindis = item.object.width || 0;
+                if ( distance[0] <= mindis ||
+                     polygon.contains(item.object.shape()) ||
+                     (item.object.type == "polygon" && item.object.shape().contains(polygon)))
+                {
+                    this.m_selectedItems.push(item);
+                }
+            }
         }
         this.refreshSelection();
     }
