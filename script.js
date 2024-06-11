@@ -912,7 +912,7 @@ class Viewport
             const objects = [];
             for (let item of rtreeCollide) {
                 const distance = polygon.distanceTo(item.object.shape());
-                const mindis = item.object.width || 0;
+                const mindis = (item.object.width || 0) / 2;
                 if ( distance[0] <= mindis ||
                      polygon.contains(item.object.shape()) ||
                      (item.object.type == "polygon" && item.object.shape().contains(polygon)))
