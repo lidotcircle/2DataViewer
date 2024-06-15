@@ -478,6 +478,175 @@ function splitString(input)
   return result;
 }
 
+class FilterRule {
+    match(_obj) {
+        return true;
+    }
+
+    toString() {
+        return "";
+    }
+};
+
+class KeyValueFilter extends FilterRule {
+    constructor(key, value) {
+        super();
+        this.m_key = key;
+        this.m_value = value;
+    }
+
+    match(obj) {
+        return obj[this.m_key] === this.m_value;
+    }
+
+    toString() {
+        return `${this.m_key}=${this.m_value}`;
+    }
+};
+
+class KeyRegexFilter extends FilterRule {
+    constructor(key, regex) {
+        super();
+        this.m_key = key;
+        this.m_regex = new RegExp(regex);
+    }
+
+    match(obj) {
+        return this.m_regex.test(obj[this.m_key]);
+    }
+
+    toString() {
+        return `${this.m_key}=/${this.m_regex.source}/`;
+    }
+}
+
+function createFilterRule(str) {
+    const kv = str.split("=");
+    if (kv.length != 2) {
+        return null;
+    }
+    if (kv[1].startsWith("/") && kv[1].endsWith("/")) {
+        return new KeyRegexFilter(kv[0], kv[1].substr(1, kv[1].length - 2));
+    }
+    return new KeyValueFilter(kv[0], kv[1]);
+}
+
+class ObjectFilter {
+    constructor(filterHtmlId, refreshCallback) {
+        this.m_filters = [];
+        this.m_rootEl = document.getElementById(filterHtmlId);
+        this.m_ruleListEl = this.m_rootEl.querySelector(".object-filter-list");
+        this.m_inputEl = this.m_rootEl.querySelector(".object-filter-input");
+        this.m_addBtn = this.m_rootEl.querySelector(".object-filter-add");
+        this.m_saveBtn = this.m_rootEl.querySelector(".object-filter-save");
+        this.m_refreshCallback = refreshCallback;
+
+        this.m_addBtn.addEventListener("click", () => {
+            const filter = createFilterRule(this.m_inputEl.value);
+            if (filter != null) {
+                this.addFilter(filter);
+                this.refreshFilterList();
+                this.saveToLocalStorage();
+                this.m_inputEl.value = "";
+            } else {
+                showError("Invalid filter rule");
+            }
+        });
+        this.m_saveBtn.addEventListener("click", () => {
+            this.saveToLocalStorage();
+        });
+        this.m_inputEl.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                this.m_addBtn.click();
+            }
+        });
+        this.m_inputEl.addEventListener("keyup", (e) => {
+            e.stopPropagation();
+        });
+
+        this.loadFromLocalStorage();
+    }
+
+    addFilter(filter) {
+        this.m_filters.push(filter);
+            this.refreshFilterList();
+    }
+
+    refreshFilterList() {
+        while (this.m_ruleListEl.firstChild) {
+            this.m_ruleListEl.removeChild(this.m_ruleListEl.firstChild);
+        }
+
+        for (let filter of this.m_filters) {
+            const li = document.createElement("li");
+            const btn = document.createElement("button");
+            btn.innerText = "X";
+            btn.addEventListener("click", () => {
+                this.removeFilter(filter);
+                this.refreshFilterList();
+            });
+            const textEl = document.createElement("span");
+            textEl.innerText = filter.toString();
+            li.appendChild(textEl);
+            li.appendChild(btn);
+            this.m_ruleListEl.appendChild(li);
+        }
+
+        this.m_refreshCallback();
+    }
+
+    removeFilter(filter) {
+        const idx = this.m_filters.indexOf(filter);
+        if (idx != -1) {
+            this.m_filters.splice(idx, 1);
+            this.refreshFilterList();
+        }
+    }
+
+    toggleFilterViewer() {
+        this.m_rootEl.classList.toggle("object-filter-show");
+    }
+
+    getRules() {
+        return this.m_filters;
+    }
+
+    dumpFilter() {
+        return this.m_filters.map(f => f.toString());
+    }
+
+    loadFilter(strList) {
+        this.m_filters = [];
+        for (let str of strList) {
+            const filter = createFilterRule(str);
+            if (filter != null) {
+                this.m_filters.push(filter);
+            }
+        }
+        this.refreshFilterList();
+    }
+
+    saveToLocalStorage() {
+        localStorage.setItem("object-filter", JSON.stringify(this.dumpFilter()));
+    }
+
+    loadFromLocalStorage() {
+        const str = localStorage.getItem("object-filter");
+        if (str != null) {
+            this.loadFilter(JSON.parse(str));
+        }
+    }
+
+    match(obj) {
+        for (let filter of this.m_filters) {
+            if (!filter.match(obj)) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
 const RTREE_ITEM_ID = Symbol("RTREE_ITEM_ID");
 class Viewport
 {
@@ -492,6 +661,12 @@ class Viewport
         this.m_selectedItemsCanvas = this.m_viewportEl.querySelector("canvas.selection");
         /** @type HTMLCanvasElement */
         this.m_coordinationBox = this.m_viewportEl.querySelector("canvas.coordination");
+        this.m_objectFilter = new ObjectFilter("object-filter", () => {
+            if (this.m_transform) {
+                this.refreshDrawingCanvas();
+                this.refreshSelection();
+            }
+        });
 		this.m_transform = AffineTransformation.identity();
         this.m_objectList = [];
         this.m_objectRTree = rbush();
@@ -805,7 +980,9 @@ class Viewport
         const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
         ctx.setTransform(baseTrans.concat(this.m_transform).convertToDOMMatrix());
         for (let item of this.m_objectList) {
-            Viewport.drawItemInCanvas(ctx, item);
+            if (this.m_objectFilter.match(item)) {
+                Viewport.drawItemInCanvas(ctx, item);
+            }
         }
 
         this.refreshCoordination();
@@ -911,6 +1088,9 @@ class Viewport
             this.m_selectedItems = [];
             const objects = [];
             for (let item of rtreeCollide) {
+                if (!this.m_objectFilter.match(item.object)) {
+                    continue;
+                }
                 const distance = polygon.distanceTo(item.object.shape());
                 const mindis = (item.object.width || 0) / 2;
                 if ( distance[0] <= mindis ||
@@ -1004,12 +1184,14 @@ class Viewport
     {
         let box = null;
         for (let obj of this.m_objectList) {
-            const kbox = obj.getBox();
-            if (box == null) {
-                box = kbox;
-            } else {
-                if (kbox) {
-                    box = box.mergeBox(kbox);
+            if (this.m_objectFilter.match(obj)) {
+                const kbox = obj.getBox();
+                if (box == null) {
+                    box = kbox;
+                } else {
+                    if (kbox) {
+                        box = box.mergeBox(kbox);
+                    }
                 }
             }
         }
@@ -1374,6 +1556,8 @@ window.addEventListener("keyup", async (e) => {
         toggleViewportStatus();
     } else if (e.key == 'i' && e.ctrlKey) {
         objectDetail.classList.toggle("object-detail-show");
+    } else if (e.key == 'm' && e.ctrlKey) {
+        viewport.m_objectFilter.toggleFilterViewer();
     }
 });
 

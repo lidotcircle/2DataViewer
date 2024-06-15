@@ -38,6 +38,61 @@ body {
     display: block;
 }
 
+#object-filter {
+    position: absolute;
+    width: 30%;
+    height: 80%;
+    top: 5%;
+    right: 0em;
+    overflow-y: scroll;
+    display: none;
+}
+
+#object-filter.object-filter-show {
+    display: block;
+}
+
+#object-filter .object-filter-list {
+    margin: 0em;
+    padding: 0em;
+}
+
+#object-filter .object-filter-list li {
+    display: flex;
+    flex-flow: row;
+    justify-content: space-between;
+    align-items: center;
+    background: RGBA(255, 255, 255, 0.5);
+    padding: 0.5em;
+    border-radius: 0.2em;
+}
+
+#object-filter input {
+    width: 100%;
+    height: 2em;
+    margin: 0.5em 0em;
+    padding: 0.5em;
+    border-radius: 0.2em;
+    border: 0em;
+}
+
+#object-filter .buttons {
+    display: flex;
+    flex-flow: row;
+    justify-content: space-around;
+    margin: 0.5em 0em;
+    padding: 0em;
+}
+    
+#object-filter .object-filter-info {
+    z-index: 999;
+    position: relative;
+    padding: 0.5em;
+    border-radius: 0.2em;
+    width: 100%;
+    background: RGBA(255, 255, 255, 0.5);
+}
+    
 .container {
     width: 100%;
     height: 100%;
