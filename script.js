@@ -539,6 +539,8 @@ class ObjectFilter {
         this.m_inputEl = this.m_rootEl.querySelector(".object-filter-input");
         this.m_addBtn = this.m_rootEl.querySelector(".object-filter-add");
         this.m_saveBtn = this.m_rootEl.querySelector(".object-filter-save");
+        this.m_enableCheckbox = this.m_rootEl.querySelector(".object-filter-toggle");
+        this.m_enableCheckbox.checked = true;
         this.m_refreshCallback = refreshCallback;
 
         this.m_addBtn.addEventListener("click", () => {
@@ -555,6 +557,9 @@ class ObjectFilter {
         this.m_saveBtn.addEventListener("click", () => {
             this.saveToLocalStorage();
         });
+        this.m_enableCheckbox.addEventListener("click", () => {
+            this.m_refreshCallback();
+        });
         this.m_inputEl.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
                 this.m_addBtn.click();
@@ -565,6 +570,10 @@ class ObjectFilter {
         });
 
         this.loadFromLocalStorage();
+    }
+
+    get enabled() {
+        return this.m_enableCheckbox.checked;
     }
 
     addFilter(filter) {
@@ -638,9 +647,11 @@ class ObjectFilter {
     }
 
     match(obj) {
-        for (let filter of this.m_filters) {
-            if (!filter.match(obj)) {
-                return false;
+        if (this.enabled) {
+            for (let filter of this.m_filters) {
+                if (!filter.match(obj)) {
+                    return false;
+                }
             }
         }
         return true;

@@ -83,6 +83,13 @@ body {
     margin: 0.5em 0em;
     padding: 0em;
 }
+
+#object-filter .buttons input {
+    width: max-content;
+    min-width: 2em;
+    padding: 0em;
+    margin: 0em;
+}
     
 #object-filter .object-filter-info {
     z-index: 999;
