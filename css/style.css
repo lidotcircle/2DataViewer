@@ -52,7 +52,7 @@ body {
     display: block;
 }
 
-#object-filter .object-filter-list {
+#object-filter .object-filter-list, .layer-filter {
     margin: 0em;
     padding: 0em;
 }
@@ -65,6 +65,24 @@ body {
     background: RGBA(255, 255, 255, 0.5);
     padding: 0.5em;
     border-radius: 0.2em;
+}
+
+#object-filter .layer-filter li {
+    display: flex;
+    flex-flow: row;
+    justify-content: space-between;
+    align-items: center;
+    background: RGBA(255, 255, 255, 0.5);
+    padding: 0.5em;
+    border-radius: 0.2em;
+}
+
+#object-filter .layer-filter span {
+    width: 100%;
+}
+
+#object-filter .layer-filter input {
+    width: 2em;
 }
 
 #object-filter input {
