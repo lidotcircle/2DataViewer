@@ -53,6 +53,13 @@ def parse_tokens(tokens):
                     value = float(next_token())
                 elif key in ['color', 'comment', 'layer']:
                     value = next_token().strip('"')
+                elif key in ['attr']:
+                    name = next_token()
+                    value = next_token().strip('"')
+                    if name not in shape:
+                        shape[name] = value
+                    next_token()  # Consume ')'
+                    continue
                 next_token()  # Consume ')'
                 if shape["type"] == "polygon" and key == "point":
                     shape.setdefault("points", []).append(value)
