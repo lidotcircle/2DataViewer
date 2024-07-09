@@ -167,15 +167,16 @@ def getFrame(nx):
     n = int(nx)
     if n >= len(frameOffset):
         return { "drawings": [] }
-    openInput.seek(frameOffset[n][0])
-    text = openInput.readline().strip()
-    tokens = tokenize(text)
-    shapes = parse_tokens(tokens)
+    shapes = []
     if frameOffset[n][1] != -1:
         openInput.seek(frameOffset[n][1])
         text = openInput.readline().strip()
         tokens = tokenize(text)
         shapes += parse_tokens(tokens)
+    openInput.seek(frameOffset[n][0])
+    text = openInput.readline().strip()
+    tokens = tokenize(text)
+    shapes += parse_tokens(tokens)
     return { "drawings": shapes }
 
 if __name__ == "__main__":
