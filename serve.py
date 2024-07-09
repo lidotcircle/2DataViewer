@@ -79,7 +79,7 @@ def parse_tokens(tokens):
         return shapes
 
     # Start parsing from the 'scene' keyword
-    if top_token() and top_token() == '(' and token_at(1) == 'scene':
+    if top_token() and top_token() == '(' and (token_at(1) == 'scene'  or token_at(1) == 'base'):
         return parse_scene()
     else:
         print("Input does not start with a scene.")
@@ -167,10 +167,15 @@ def getFrame(nx):
     n = int(nx)
     if n >= len(frameOffset):
         return { "drawings": [] }
-    openInput.seek(frameOffset[n])
+    openInput.seek(frameOffset[n][0])
     text = openInput.readline().strip()
     tokens = tokenize(text)
     shapes = parse_tokens(tokens)
+    if frameOffset[n][1] != -1:
+        openInput.seek(frameOffset[n][1])
+        text = openInput.readline().strip()
+        tokens = tokenize(text)
+        shapes += parse_tokens(tokens)
     return { "drawings": shapes }
 
 if __name__ == "__main__":
@@ -180,6 +185,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", "-p",  type=int, default=3527, help="listening port")
     args = parser.parse_args()
 
+    baseOffset = -1
     if args.input is not None:
         openInput = open(args.input, "r")
         while True:
@@ -187,7 +193,10 @@ if __name__ == "__main__":
             n = openInput.readline().strip()
             if n == '':
                 break
-            frameOffset.append(off)
+            if n.startswith("(base "):
+                baseOffset = off
+                continue
+            frameOffset.append([off, baseOffset])
             if (len(frameOffset) > 1):
                 continue
             try:
