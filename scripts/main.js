@@ -21,7 +21,8 @@ const objectDetailText = document.getElementById('object-detail-text');
 const objectDetailCount = document.getElementById('object-detail-count');
 const objectDetail = document.getElementById('object-detail');
 
-import { Point, Segment, Circle, Polygon } from './flatten.js';
+import {Point, Segment, Circle, Polygon} from './flatten.js';
+import RBush from './rbush.js'
 
 class AffineTransformation {
     constructor(a, b, c, d, tx, ty) {
@@ -33,12 +34,13 @@ class AffineTransformation {
         this.ty = ty || 0;
     }
 
-    static identity() { return new AffineTransformation(1, 0, 0, 1, 0, 0); }
+    static identity() {
+        return new AffineTransformation(1, 0, 0, 1, 0, 0);
+    }
 
     static rotate(angle) {
         return new AffineTransformation(
-            Math.cos(angle), Math.sin(angle),
-            -Math.sin(angle), Math.cos(angle),
+            Math.cos(angle), Math.sin(angle), -Math.sin(angle), Math.cos(angle),
             0, 0);
     }
 
@@ -64,13 +66,13 @@ class AffineTransformation {
     applyXY(point) {
         const x = this.a * point.x + this.b * point.y + this.tx;
         const y = this.c * point.x + this.d * point.y + this.ty;
-        return { x, y };
+        return {x, y};
     }
 
     revertXY(point) {
         const determinant = this.a * this.d - this.b * this.c;
         if (determinant === 0) {
-            throw new Error("Transformation is not invertible.");
+            throw new Error('Transformation is not invertible.');
         }
 
         const invDet = 1 / determinant;
@@ -84,12 +86,12 @@ class AffineTransformation {
         const x = newA * point.x + newB * point.y + newTx;
         const y = newC * point.x + newD * point.y + newTy;
 
-        return { x, y };
+        return {x, y};
     }
 
-    convertToDOMMatrix()
-    {
-        return new DOMMatrix([this.a, this.b, this.c, this.d, this.tx, this.ty]);
+    convertToDOMMatrix() {
+        return new DOMMatrix(
+            [this.a, this.b, this.c, this.d, this.tx, this.ty]);
     }
 }
 
@@ -103,7 +105,8 @@ class BoundingBox {
         this.maxY = Math.max(point1.y, point2.y);
     }
 
-    // Method to merge another point into the bounding box and return a new bounding box
+    // Method to merge another point into the bounding box and return a new
+    // bounding box
     mergePoint(point) {
         // Calculate new bounding box coordinates
         const minX = Math.min(this.minX, point.x);
@@ -112,7 +115,7 @@ class BoundingBox {
         const maxY = Math.max(this.maxY, point.y);
 
         // Return a new BoundingBox object with the updated coordinates
-        return new BoundingBox({ x: minX, y: minY }, { x: maxX, y: maxY });
+        return new BoundingBox({x: minX, y: minY}, {x: maxX, y: maxY});
     }
 
     mergeBox(box) {
@@ -120,7 +123,9 @@ class BoundingBox {
     }
 
     move(vec) {
-        return new BoundingBox({ x: minX + vec.x, y: minY + vec.y }, { x: maxX + vec.x, y: maxY + vec.y });
+        return new BoundingBox(
+            {x: minX + vec.x, y: minY + vec.y},
+            {x: maxX + vec.x, y: maxY + vec.y});
     }
 
     // Method to check if a point is inside the bounding box
@@ -145,21 +150,30 @@ class BoundingBox {
     }
 
     getCenter() {
-        return {x: (this.getBL().x + this.getTR().x) / 2, y: (this.getBL().y + this.getTR().y) / 2};
+        return {
+            x: (this.getBL().x + this.getTR().x) / 2,
+            y: (this.getBL().y + this.getTR().y) / 2
+        };
     }
 
     inflate(off) {
-        return new BoundingBox(PointSub(this.getBL(), {x: off, y: off}), PointAdd(this.getTR(), {x: off, y: off}));
+        return new BoundingBox(
+            PointSub(this.getBL(), {x: off, y: off}),
+            PointAdd(this.getTR(), {x: off, y: off}));
     }
 
-    getBL() { return {x: this.minX, y: this.minY}; }
+    getBL() {
+        return {x: this.minX, y: this.minY};
+    }
 
-    getTR() { return {x: this.maxX, y: this.maxY}; }
+    getTR() {
+        return {x: this.maxX, y: this.maxY};
+    }
 }
 
-function Box2boxTransformation(box1, box2)
-{
-    const s = Math.min(box2.getHeight() / box1.getHeight(), box2.getWidth() / box1.getWidth());
+function Box2boxTransformation(box1, box2) {
+    const s = Math.min(
+        box2.getHeight() / box1.getHeight(), box2.getWidth() / box1.getWidth());
     const c1 = box1.getCenter();
     const c2 = box2.getCenter();
     return new AffineTransformation(1, 0, 0, 1, c2.x, c2.y)
@@ -170,22 +184,22 @@ function Box2boxTransformation(box1, box2)
 function invertColor(color) {
     // Convert named colors to hexadecimal
     const colors = {
-        "black": "#000000",
-        "white": "#ffffff",
-        "red": "#ff0000",
-        "lime": "#00ff00",
-        "blue": "#0000ff",
-        "yellow": "#ffff00",
-        "cyan": "#00ffff",
-        "magenta": "#ff00ff",
-        "silver": "#c0c0c0",
-        "gray": "#808080",
-        "maroon": "#800000",
-        "olive": "#808000",
-        "green": "#008000",
-        "purple": "#800080",
-        "teal": "#008080",
-        "navy": "#000080",
+        'black': '#000000',
+        'white': '#ffffff',
+        'red': '#ff0000',
+        'lime': '#00ff00',
+        'blue': '#0000ff',
+        'yellow': '#ffff00',
+        'cyan': '#00ffff',
+        'magenta': '#ff00ff',
+        'silver': '#c0c0c0',
+        'gray': '#808080',
+        'maroon': '#800000',
+        'olive': '#808000',
+        'green': '#008000',
+        'purple': '#800080',
+        'teal': '#008080',
+        'navy': '#000080',
         // Add more named colors if needed
     };
 
@@ -194,22 +208,23 @@ function invertColor(color) {
     }
 
     // Convert hex format to RGB
-    if (color[0] === "#") {
-        color = color.slice(1); // Remove '#'
+    if (color[0] === '#') {
+        color = color.slice(1);  // Remove '#'
         if (color.length === 3) {
-            color = color[0] + color[0] + color[1] + color[1] + color[2] + color[2]; // Convert 3-digit hex to 6-digit
+            color = color[0] + color[0] + color[1] + color[1] + color[2] +
+                color[2];  // Convert 3-digit hex to 6-digit
         }
         const r = parseInt(color.substr(0, 2), 16);
         const g = parseInt(color.substr(2, 2), 16);
         const b = parseInt(color.substr(4, 2), 16);
-        color = `rgb(${r},${g},${b})`; // Convert to RGB
+        color = `rgb(${r},${g},${b})`;  // Convert to RGB
     }
 
     // Invert RGB (and optionally RGBA)
-    if (color.includes("rgba")) {
+    if (color.includes('rgba')) {
         let [r, g, b, a] = color.match(/\d+/g).map(Number);
         return `rgba(${255 - r},${255 - g},${255 - b},${a})`;
-    } else if (color.includes("rgb")) {
+    } else if (color.includes('rgb')) {
         let [r, g, b] = color.match(/\d+/g).map(Number);
         return `rgb(${255 - r},${255 - g},${255 - b})`;
     }
@@ -220,15 +235,15 @@ function invertColor(color) {
 
 function findLineSegmentIntersection(A, B, C, D) {
     // Calculate differences
-    let diffBA = { x: B.x - A.x, y: B.y - A.y };
-    let diffDC = { x: D.x - C.x, y: D.y - C.y };
-    let diffCA = { x: C.x - A.x, y: C.y - A.y };
+    let diffBA = {x: B.x - A.x, y: B.y - A.y};
+    let diffDC = {x: D.x - C.x, y: D.y - C.y};
+    let diffCA = {x: C.x - A.x, y: C.y - A.y};
 
     // Determinant
     let det = diffBA.x * diffDC.y - diffBA.y * diffDC.x;
     // If determinant is zero, lines are parallel or coincident
     if (det === 0) {
-        return null; // No intersection
+        return null;  // No intersection
     }
 
     let t = (diffCA.x * diffDC.y - diffCA.y * diffDC.x) / det;
@@ -237,13 +252,10 @@ function findLineSegmentIntersection(A, B, C, D) {
     // Check if 0 <= t <= 1 and 0 <= u <= 1
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
         // Intersection point
-        return {
-            x: A.x + t * diffBA.x,
-            y: A.y + t * diffBA.y
-        };
+        return {x: A.x + t * diffBA.x, y: A.y + t * diffBA.y};
     }
 
-    return null; // No intersection
+    return null;  // No intersection
 }
 
 // Tokenize function (handles comments)
@@ -263,17 +275,20 @@ function parseTokens(tokens) {
     }
 
     function parseShape(type) {
-        const shape = { type };
-        while (currentTokenIndex < tokens.length && tokens[currentTokenIndex] !== ')') {
+        const shape = {type};
+        while (currentTokenIndex < tokens.length &&
+               tokens[currentTokenIndex] !== ')') {
             nextToken();
             let key = nextToken();
-            if (key === 'point' && (shape['type'] === 'line' || shape['type'] === 'cline')) {
+            if (key === 'point' &&
+                (shape['type'] === 'line' || shape['type'] === 'cline')) {
                 key = shape['point1'] ? 'point2' : 'point1';
             }
-            if (key === 'point' || key === 'point1' || key === 'point2' || key === 'center') {
+            if (key === 'point' || key === 'point1' || key === 'point2' ||
+                key === 'center') {
                 const x = parseFloat(nextToken());
                 const y = parseFloat(nextToken());
-                const value = { x, y };
+                const value = {x, y};
                 if (shape.type === 'polygon') {
                     shape.points = shape.points || [];
                     shape.points.push(value);
@@ -282,19 +297,21 @@ function parseTokens(tokens) {
                 }
             } else if (key === 'radius' || key === 'width') {
                 shape[key] = parseFloat(nextToken());
-            } else if (key === 'color' || key === 'comment' || key === 'layer') {
+            } else if (
+                key === 'color' || key === 'comment' || key === 'layer') {
                 shape[key] = nextToken().replace(/"/g, '');
             }
             nextToken();
         }
-        currentTokenIndex++; // Skip closing parenthesis
+        currentTokenIndex++;  // Skip closing parenthesis
         return shape;
     }
 
     while (currentTokenIndex < tokens.length) {
         const token = nextToken();
         if (token === '(') {
-            const k = nextToken(); // Skip 'scene' or shape type token, handled in parseShape
+            const k = nextToken();  // Skip 'scene' or shape type token, handled
+                                    // in parseShape
             if (k !== 'scene') {
                 shapes.push(parseShape(k));
             }
@@ -306,48 +323,49 @@ function parseTokens(tokens) {
 
 // Serialize shape object to Lisp-like string
 function serializeShape(shape) {
-    let serialized = `(${shape["type"]}`;
-    if (shape["type"] === "polygon") {
-        shape["points"].forEach(point => {
-            serialized += ` (point ${point["x"]} ${point["y"]})`;
+    let serialized = `(${shape['type']}`;
+    if (shape['type'] === 'polygon') {
+        shape['points'].forEach(point => {
+            serialized += ` (point ${point['x']} ${point['y']})`;
         });
     } else {
-        if ("point1" in shape) {
-            serialized += ` (point ${shape["point1"]["x"]} ${shape["point1"]["y"]})`;
-            serialized += ` (point ${shape["point2"]["x"]} ${shape["point2"]["y"]})`;
+        if ('point1' in shape) {
+            serialized +=
+                ` (point ${shape['point1']['x']} ${shape['point1']['y']})`;
+            serialized +=
+                ` (point ${shape['point2']['x']} ${shape['point2']['y']})`;
         }
-        if ("center" in shape) {
-            serialized += ` (center ${shape["center"]["x"]} ${shape["center"]["y"]})`;
-            serialized += ` (radius ${shape["radius"]})`;
+        if ('center' in shape) {
+            serialized +=
+                ` (center ${shape['center']['x']} ${shape['center']['y']})`;
+            serialized += ` (radius ${shape['radius']})`;
         }
     }
-    if ("width" in shape) {
-        serialized += ` (width ${shape["width"]})`;
+    if ('width' in shape) {
+        serialized += ` (width ${shape['width']})`;
     }
-    if ("color" in shape) {
-        serialized += ` (color "${shape["color"]}")`;
+    if ('color' in shape) {
+        serialized += ` (color "${shape['color']}")`;
     }
     serialized += ')';
     return serialized;
 }
 
 function serializeShapes(shapes) {
-    let serialized = "(scene\n";
+    let serialized = '(scene\n';
     shapes.forEach(shape => {
-        serialized += "  " + serializeShape(shape) + "\n";
+        serialized += '  ' + serializeShape(shape) + '\n';
     });
-    serialized += ")";
+    serialized += ')';
     return serialized;
 }
 
-function PointAdd(p1, p2)
-{
-    return {x: p1.x + p2.x, y: p1.y + p2.y };
+function PointAdd(p1, p2) {
+    return {x: p1.x + p2.x, y: p1.y + p2.y};
 }
 
-function PointSub(p1, p2)
-{
-    return {x: p1.x - p2.x, y: p1.y - p2.y };
+function PointSub(p1, p2) {
+    return {x: p1.x - p2.x, y: p1.y - p2.y};
 }
 
 function toPoint(p) {
@@ -368,27 +386,27 @@ function sanitizePoints(obj) {
 
 class DrawItem {
     static CreateCircle(center, radius) {
-        let ans = new DrawItem("circle");
+        let ans = new DrawItem('circle');
         ans.center = center;
         ans.radius = radius;
         return ans;
     }
     static CreateLine(ptA, ptB, width) {
-        let ans = new DrawItem("line");
+        let ans = new DrawItem('line');
         ans.point1 = ptA;
         ans.point2 = ptB;
         ans.width = width;
         return ans;
     }
     static CreateCLine(ptA, ptB, width) {
-        let ans = new DrawItem("cline");
+        let ans = new DrawItem('cline');
         ans.point1 = ptA;
         ans.point2 = ptB;
         ans.width = width;
         return ans;
     }
     static CreatePolygon(points) {
-        let ans = new DrawItem("polygon");
+        let ans = new DrawItem('polygon');
         ans.points = points;
         return ans;
     }
@@ -399,18 +417,21 @@ class DrawItem {
 
     setColor(color) {
         this.color = color;
-    } 
+    }
 
     getBox() {
-        if (this.type == "circle") {
+        if (this.type == 'circle') {
             const r = this.radius;
             const c = this.center;
-            return new BoundingBox(PointSub(c , {x: r, y: r}), PointAdd(c , {x: r, y: r}));
-        } else if (this.type == "line") {
-            return  new BoundingBox(this.point1, this.point2).inflate(this.width / 2);
-        } else if (this.type == "cline") {
-            return  new BoundingBox(this.point1, this.point2).inflate(this.width / 2);
-        } else if (this.type == "polygon") {
+            return new BoundingBox(
+                PointSub(c, {x: r, y: r}), PointAdd(c, {x: r, y: r}));
+        } else if (this.type == 'line') {
+            return new BoundingBox(this.point1, this.point2)
+                .inflate(this.width / 2);
+        } else if (this.type == 'cline') {
+            return new BoundingBox(this.point1, this.point2)
+                .inflate(this.width / 2);
+        } else if (this.type == 'polygon') {
             let box = null;
             for (let pt of this.points) {
                 if (box == null) {
@@ -432,16 +453,18 @@ class DrawItem {
 
         sanitizePoints(this);
         switch (this.type) {
-            case "circle":
+            case 'circle':
                 this.m_shape = new Circle(toPoint(this.center), this.radius);
                 break;
-            case "line":
-                this.m_shape = new Segment(toPoint(this.point1), toPoint(this.point2));
+            case 'line':
+                this.m_shape =
+                    new Segment(toPoint(this.point1), toPoint(this.point2));
                 break;
-            case "cline":
-                this.m_shape = new Segment(toPoint(this.point1), toPoint(this.point2));
+            case 'cline':
+                this.m_shape =
+                    new Segment(toPoint(this.point1), toPoint(this.point2));
                 break;
-            case "polygon":
+            case 'polygon':
                 this.m_shape = new Polygon(this.points);
                 break;
             default:
@@ -452,30 +475,28 @@ class DrawItem {
     }
 }
 
-function showError(msg)
-{
-    errorBar.classList.add("error-bar-show");
+function showError(msg) {
+    errorBar.classList.add('error-bar-show');
     errorBar.innerText = msg;
-    setTimeout(() => errorBar.classList.remove("error-bar-show"), 2000);
+    setTimeout(() => errorBar.classList.remove('error-bar-show'), 2000);
 }
 
-function splitString(input)
-{
-  const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/g;
-  const result = [];
-  let match;
+function splitString(input) {
+    const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/g;
+    const result = [];
+    let match;
 
-  while ((match = regex.exec(input)) !== null) {
-    if (match[1]) {
-      result.push(match[1]);
-    } else if (match[2]) {
-      result.push(match[2]);
-    } else {
-      result.push(match[0]);
+    while ((match = regex.exec(input)) !== null) {
+        if (match[1]) {
+            result.push(match[1]);
+        } else if (match[2]) {
+            result.push(match[2]);
+        } else {
+            result.push(match[0]);
+        }
     }
-  }
 
-  return result;
+    return result;
 }
 
 class FilterRule {
@@ -488,7 +509,7 @@ class FilterRule {
     }
 
     toString() {
-        return "";
+        return '';
     }
 };
 
@@ -497,7 +518,7 @@ class KeyValueFilter extends FilterRule {
         super();
         this.m_key = key;
         this.m_value = value;
-        if (this.m_key.startsWith("@")) {
+        if (this.m_key.startsWith('@')) {
             this.m_key = this.m_key.substr(1);
             this.enabled = false;
         }
@@ -511,7 +532,7 @@ class KeyValueFilter extends FilterRule {
     }
 
     toString(s) {
-        return `${this.enabled || s ? "" : "@"}${this.m_key}=${this.m_value}`;
+        return `${this.enabled || s ? '' : '@'}${this.m_key}=${this.m_value}`;
     }
 };
 
@@ -520,7 +541,7 @@ class KeyRegexFilter extends FilterRule {
         super();
         this.m_key = key;
         this.m_regex = new RegExp(regex);
-        if (this.m_key.startsWith("@")) {
+        if (this.m_key.startsWith('@')) {
             this.m_key = this.m_key.substr(1);
             this.enabled = false;
         }
@@ -534,7 +555,8 @@ class KeyRegexFilter extends FilterRule {
     }
 
     toString(s) {
-        return `${this.enabled || s ? "" : "@"}${this.m_key}=/${this.m_regex.source}/`;
+        return `${this.enabled || s ? '' : '@'}${this.m_key}=/${
+            this.m_regex.source}/`;
     }
 }
 
@@ -542,7 +564,7 @@ class LayerFilter extends FilterRule {
     constructor() {
         super();
         this.m_layerStatus = new Map();
-        this.m_layerStatus.set("default", true);
+        this.m_layerStatus.set('default', true);
     }
 
     layerList() {
@@ -559,7 +581,7 @@ class LayerFilter extends FilterRule {
             return true;
         }
         if (obj.layer == null) {
-            return this.m_layerStatus.get("default");
+            return this.m_layerStatus.get('default');
         }
         return this.m_layerStatus.get(obj.layer);
     }
@@ -590,11 +612,11 @@ class LayerFilter extends FilterRule {
 }
 
 function createFilterRule(str) {
-    const kv = str.split("=");
+    const kv = str.split('=');
     if (kv.length != 2) {
         return null;
     }
-    if (kv[1].startsWith("/") && kv[1].endsWith("/")) {
+    if (kv[1].startsWith('/') && kv[1].endsWith('/')) {
         return new KeyRegexFilter(kv[0], kv[1].substr(1, kv[1].length - 2));
     }
     return new KeyValueFilter(kv[0], kv[1]);
@@ -604,39 +626,40 @@ class ObjectFilter {
     constructor(filterHtmlId, refreshCallback) {
         this.m_filters = [];
         this.m_rootEl = document.getElementById(filterHtmlId);
-        this.m_ruleListEl = this.m_rootEl.querySelector(".object-filter-list");
-        this.m_inputEl = this.m_rootEl.querySelector(".object-filter-input");
-        this.m_addBtn = this.m_rootEl.querySelector(".object-filter-add");
-        this.m_saveBtn = this.m_rootEl.querySelector(".object-filter-save");
-        this.m_enableCheckbox = this.m_rootEl.querySelector(".object-filter-toggle");
-        this.m_layerFilterEl = this.m_rootEl.querySelector(".layer-filter");
+        this.m_ruleListEl = this.m_rootEl.querySelector('.object-filter-list');
+        this.m_inputEl = this.m_rootEl.querySelector('.object-filter-input');
+        this.m_addBtn = this.m_rootEl.querySelector('.object-filter-add');
+        this.m_saveBtn = this.m_rootEl.querySelector('.object-filter-save');
+        this.m_enableCheckbox =
+            this.m_rootEl.querySelector('.object-filter-toggle');
+        this.m_layerFilterEl = this.m_rootEl.querySelector('.layer-filter');
         this.m_enableCheckbox.checked = true;
         this.m_refreshCallback = refreshCallback;
         this.m_layerFilter = new LayerFilter();
 
-        this.m_addBtn.addEventListener("click", () => {
+        this.m_addBtn.addEventListener('click', () => {
             const filter = createFilterRule(this.m_inputEl.value);
             if (filter != null) {
                 this.addFilter(filter);
                 this.refreshFilterList();
                 this.saveToLocalStorage();
-                this.m_inputEl.value = "";
+                this.m_inputEl.value = '';
             } else {
-                showError("Invalid filter rule");
+                showError('Invalid filter rule');
             }
         });
-        this.m_saveBtn.addEventListener("click", () => {
+        this.m_saveBtn.addEventListener('click', () => {
             this.saveToLocalStorage();
         });
-        this.m_enableCheckbox.addEventListener("click", () => {
+        this.m_enableCheckbox.addEventListener('click', () => {
             this.m_refreshCallback();
         });
-        this.m_inputEl.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
+        this.m_inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
                 this.m_addBtn.click();
             }
         });
-        this.m_inputEl.addEventListener("keyup", (e) => {
+        this.m_inputEl.addEventListener('keyup', (e) => {
             e.stopPropagation();
         });
 
@@ -649,7 +672,7 @@ class ObjectFilter {
 
     addFilter(filter) {
         this.m_filters.push(filter);
-            this.refreshFilterList();
+        this.refreshFilterList();
     }
 
     refreshFilterList() {
@@ -658,31 +681,31 @@ class ObjectFilter {
         }
 
         for (let filter of this.m_filters) {
-            const li = document.createElement("li");
-            const btn = document.createElement("button");
-            btn.innerText = "X";
-            btn.addEventListener("click", () => {
+            const li = document.createElement('li');
+            const btn = document.createElement('button');
+            btn.innerText = 'X';
+            btn.addEventListener('click', () => {
                 this.removeFilter(filter);
                 this.refreshFilterList();
             });
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
             checkbox.checked = filter.enabled;
-            checkbox.addEventListener("click", () => {
+            checkbox.addEventListener('click', () => {
                 this.setFilterEnabled(filter, checkbox.checked);
                 this.m_refreshCallback();
             });
-            const textEl = document.createElement("span");
+            const textEl = document.createElement('span');
             textEl.innerText = filter.toString(true);
             li.appendChild(textEl);
-            const ctrls = document.createElement("span");
+            const ctrls = document.createElement('span');
             ctrls.appendChild(checkbox);
             ctrls.appendChild(btn);
-            btn.style.margin = "0.5em 0.25em";
-            btn.style.userSelect = "none";
-            ctrls.style.display = "grid";
-            ctrls.style.gridTemplateColumns = "2em 2em";
-            ctrls.style.gridColumnGap = "0.5em";
+            btn.style.margin = '0.5em 0.25em';
+            btn.style.userSelect = 'none';
+            ctrls.style.display = 'grid';
+            ctrls.style.gridTemplateColumns = '2em 2em';
+            ctrls.style.gridColumnGap = '0.5em';
             li.appendChild(ctrls);
             this.m_ruleListEl.appendChild(li);
         }
@@ -691,15 +714,15 @@ class ObjectFilter {
             this.m_layerFilterEl.removeChild(this.m_layerFilterEl.firstChild);
         }
         this.m_layerFilter.layerList().forEach(([layer, enabled]) => {
-            const li = document.createElement("li");
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
+            const li = document.createElement('li');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
             checkbox.checked = enabled;
-            checkbox.addEventListener("click", () => {
+            checkbox.addEventListener('click', () => {
                 this.m_layerFilter.toggleLayer(layer);
                 this.m_refreshCallback();
             });
-            const textEl = document.createElement("span");
+            const textEl = document.createElement('span');
             textEl.innerText = layer;
             li.appendChild(textEl);
             li.appendChild(checkbox);
@@ -729,7 +752,7 @@ class ObjectFilter {
     }
 
     toggleFilterViewer() {
-        this.m_rootEl.classList.toggle("object-filter-show");
+        this.m_rootEl.classList.toggle('object-filter-show');
     }
 
     getRules() {
@@ -750,16 +773,17 @@ class ObjectFilter {
         }
         this.refreshFilterList();
         if (this.m_filters.length > 0) {
-            this.m_rootEl.classList.add("object-filter-show");
+            this.m_rootEl.classList.add('object-filter-show');
         }
     }
 
     saveToLocalStorage() {
-        localStorage.setItem("object-filter", JSON.stringify(this.dumpFilter()));
+        localStorage.setItem(
+            'object-filter', JSON.stringify(this.dumpFilter()));
     }
 
     loadFromLocalStorage() {
-        const str = localStorage.getItem("object-filter");
+        const str = localStorage.getItem('object-filter');
         if (str != null) {
             this.loadFilter(JSON.parse(str));
         }
@@ -777,35 +801,38 @@ class ObjectFilter {
     }
 };
 
-const RTREE_ITEM_ID = Symbol("RTREE_ITEM_ID");
-class Viewport
-{
-    constructor(canvasId)
-    {
-        this.m_viewportEl = document.getElementById(canvasId)
+const RTREE_ITEM_ID = Symbol('RTREE_ITEM_ID');
+class Viewport {
+    constructor(canvasId) {
+        this.m_viewportEl = document
+                                .getElementById(canvasId)
+                            /** @type HTMLCanvasElement */
+                            this.m_canvas =
+            this.m_viewportEl.querySelector('canvas.drawing');
         /** @type HTMLCanvasElement */
-        this.m_canvas = this.m_viewportEl.querySelector("canvas.drawing");
+        this.m_selectionBox =
+            this.m_viewportEl.querySelector('canvas.selection-box');
         /** @type HTMLCanvasElement */
-        this.m_selectionBox = this.m_viewportEl.querySelector("canvas.selection-box");
+        this.m_selectedItemsCanvas =
+            this.m_viewportEl.querySelector('canvas.selection');
         /** @type HTMLCanvasElement */
-        this.m_selectedItemsCanvas = this.m_viewportEl.querySelector("canvas.selection");
-        /** @type HTMLCanvasElement */
-        this.m_coordinationBox = this.m_viewportEl.querySelector("canvas.coordination");
-        this.m_objectFilter = new ObjectFilter("object-filter", () => {
+        this.m_coordinationBox =
+            this.m_viewportEl.querySelector('canvas.coordination');
+        this.m_objectFilter = new ObjectFilter('object-filter', () => {
             if (this.m_transform) {
                 this.refreshDrawingCanvas();
                 this.refreshSelection();
             }
         });
-		this.m_transform = AffineTransformation.identity();
+        this.m_transform = AffineTransformation.identity();
         this.m_objectList = [];
-        this.m_objectRTree = rbush();
+        this.m_objectRTree = new RBush();
         this.m_viewportConfig = {
-            "default_width": 1,
-            "default_color": "rgba(99, 99, 99, 0.99)",
-            "default_background": "#2c2929",
+            'default_width': 1,
+            'default_color': 'rgba(99, 99, 99, 0.99)',
+            'default_background': '#2c2929',
         };
-        window.addEventListener("resize", () => this.fitCanvas());
+        window.addEventListener('resize', () => this.fitCanvas());
         this.fitCanvas();
     }
 
@@ -899,26 +926,26 @@ class Viewport
     cmdSet(args) {
         const argv = splitString(args);
         if (argv.length == 0) {
-            showError("set nothing");
+            showError('set nothing');
             return;
         }
 
         if (argv[0] == 'color') {
             if (argv.length != 2) {
-                showError("fail to set default color");
+                showError('fail to set default color');
                 return;
             }
             this.m_viewportConfig.default_color = argv[1];
         } else if (argv[0] == 'background') {
             if (argv.length != 2) {
-                showError("fail to set default background");
+                showError('fail to set default background');
                 return;
             }
             this.m_viewportConfig.default_background = argv[1];
             this.m_viewportEl.style.background = argv[1];
         } else if (argv[0] == 'width') {
             if (argv.length != 2) {
-                showError("fail to set default width");
+                showError('fail to set default width');
                 return;
             }
             this.m_viewportConfig.default_width = argv[1];
@@ -929,18 +956,19 @@ class Viewport
 
     cmdDraw(args) {
         let addn = 0;
-        const kregex = /\s*([a-zA-Z0-9]*\s*=\s*)?[({]\s*(?:m?_?x\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*,\s*(?:m?_?y\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*[})]/g;
+        const kregex =
+            /\s*([a-zA-Z0-9]*\s*=\s*)?[({]\s*(?:m?_?x\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*,\s*(?:m?_?y\s*=\s*)?(-?\d+|-?\d+\.\d+)\s*[})]/g;
         const pts = [];
         let match;
         while ((match = kregex.exec(args)) !== null) {
-            pts.push({ x: parseInt(match[2]), y: parseInt(match[3]) });
+            pts.push({x: parseInt(match[2]), y: parseInt(match[3])});
         }
 
         if (pts.length > 1) {
-            for (let i=0;i+1<pts.length;i++) {
-                const drawItem = new DrawItem("cline")
+            for (let i = 0; i + 1 < pts.length; i++) {
+                const drawItem = new DrawItem('cline')
                 drawItem.point1 = pts[i];
-                drawItem.point2 = pts[i+1];
+                drawItem.point2 = pts[i + 1];
                 this.addDrawingObject(drawItem);
                 addn++;
             }
@@ -954,7 +982,9 @@ class Viewport
                     this.addDrawingObject(drawItem);
                     addn++;
                 }
-            } catch (err) { showError(err); }
+            } catch (err) {
+                showError(err);
+            }
         }
         if (addn > 0) {
             this.refreshDrawingCanvas();
@@ -973,7 +1003,7 @@ class Viewport
             this.cmdZoom();
         } else if (c === 'set') {
             this.cmdSet(cmd.substr(4));
-        }else {
+        } else {
             showError(`cann't not execute '${cmd}'`);
         }
     }
@@ -987,26 +1017,31 @@ class Viewport
      * @param ratio { float }
      * @param ignoreLength { boolean }
      */
-    static drawTextAtLine(ctx, from, to, height, text, ratio, ignoreLength)
-    {
+    static drawTextAtLine(ctx, from, to, height, text, ratio, ignoreLength) {
         ctx.save();
-        ctx.textBaseline = "bottom";
+        ctx.textBaseline = 'bottom';
         const expectedHeight = height;
-        ctx.font = "48px serif";
+        ctx.font = '48px serif';
         const m = ctx.measureText(text);
         const c = PointAdd(from, to);
         const diff = PointSub(from, to);
         const atanv = Math.atan(diff.y / (diff.x == 0 ? 1 : diff.x));
-        const angle = diff.x == 0 ? (diff.y > 0 ? Math.PI / 2 : Math.PI * 1.5) : (diff.x > 0 ? atanv : atanv + Math.PI);
-        const textheight = m.actualBoundingBoxAscent - m.actualBoundingBoxDescent;
+        const angle = diff.x == 0 ? (diff.y > 0 ? Math.PI / 2 : Math.PI * 1.5) :
+                                    (diff.x > 0 ? atanv : atanv + Math.PI);
+        const textheight =
+            m.actualBoundingBoxAscent - m.actualBoundingBoxDescent;
         const len = Math.sqrt(diff.x * diff.x + diff.y * diff.y);
-        const s = Math.min(ignoreLength ? expectedHeight /textheight : len / m.width, expectedHeight / textheight) * ratio;
-        const t = 
-            AffineTransformation.translate(c.x / 2, c.y / 2)
-                .concat(AffineTransformation.rotate(-angle + Math.PI))
-                .concat(AffineTransformation.scale(s, s))
-                .concat(AffineTransformation.translate(-m.width/2, -textheight/2))
-                .concat(new AffineTransformation(1, 0, 0, -1, 0, 0));
+        const s =
+            Math.min(
+                ignoreLength ? expectedHeight / textheight : len / m.width,
+                expectedHeight / textheight) *
+            ratio;
+        const t = AffineTransformation.translate(c.x / 2, c.y / 2)
+                      .concat(AffineTransformation.rotate(-angle + Math.PI))
+                      .concat(AffineTransformation.scale(s, s))
+                      .concat(AffineTransformation.translate(
+                          -m.width / 2, -textheight / 2))
+                      .concat(new AffineTransformation(1, 0, 0, -1, 0, 0));
         ctx.setTransform(ctx.getTransform().multiply(t.convertToDOMMatrix()));
         ctx.fillText(text, 0, 0);
         ctx.restore();
@@ -1017,7 +1052,7 @@ class Viewport
      * @param item { DrawItem }
      */
     static drawItemInCanvas(ctx, item) {
-        if (item.type == "line") {
+        if (item.type == 'line') {
             ctx.strokeStyle = item.color;
             ctx.lineWidth = item.width;
             const path = new Path2D();
@@ -1026,19 +1061,26 @@ class Viewport
             ctx.stroke(path);
             if (item.comment) {
                 ctx.fillStyle = 'white';
-                this.drawTextAtLine(ctx, item.point1, item.point2, item.width, item.comment, 0.95, false);
+                this.drawTextAtLine(
+                    ctx, item.point1, item.point2, item.width, item.comment,
+                    0.95, false);
             }
-        } else if (item.type == "circle") {
+        } else if (item.type == 'circle') {
             ctx.fillStyle = item.color;
             const path = new Path2D();
-            path.ellipse(item.center.x, item.center.y, item.radius,
-                item.radius, 0, 0, 360);;
+            path.ellipse(
+                item.center.x, item.center.y, item.radius, item.radius, 0, 0,
+                360);
+            ;
             ctx.fill(path);
             if (item.comment) {
                 ctx.fillStyle = 'white';
-                this.drawTextAtLine(ctx, PointSub(item.center, {x: item.radius*0.6, y:0}), PointAdd(item.center, {x: item.radius*0.6, y:0}), item.radius * 1.2, item.comment, 0.95, false);
+                this.drawTextAtLine(
+                    ctx, PointSub(item.center, {x: item.radius * 0.6, y: 0}),
+                    PointAdd(item.center, {x: item.radius * 0.6, y: 0}),
+                    item.radius * 1.2, item.comment, 0.95, false);
             }
-        } else if (item.type == "cline") {
+        } else if (item.type == 'cline') {
             ctx.strokeStyle = item.color;
             ctx.lineWidth = item.width;
             {
@@ -1050,22 +1092,28 @@ class Viewport
             {
                 ctx.fillStyle = item.color;
                 const path = new Path2D();
-                path.ellipse(item.point1.x, item.point1.y, item.width / 2,
-                    item.width / 2, 0, 0, 360);;
+                path.ellipse(
+                    item.point1.x, item.point1.y, item.width / 2,
+                    item.width / 2, 0, 0, 360);
+                ;
                 ctx.fill(path);
             }
             {
                 ctx.fillStyle = item.color;
                 const path = new Path2D();
-                path.ellipse(item.point2.x, item.point2.y, item.width / 2,
-                    item.width / 2, 0, 0, 360);;
+                path.ellipse(
+                    item.point2.x, item.point2.y, item.width / 2,
+                    item.width / 2, 0, 0, 360);
+                ;
                 ctx.fill(path);
             }
             if (item.comment) {
                 ctx.fillStyle = 'white';
-                this.drawTextAtLine(ctx, item.point1, item.point2, item.width, item.comment, 0.95, false);
+                this.drawTextAtLine(
+                    ctx, item.point1, item.point2, item.width, item.comment,
+                    0.95, false);
             }
-        } else if (item.type == "polygon") {
+        } else if (item.type == 'polygon') {
             ctx.fillStyle = item.color;
             let pointSum = {x: 0, y: 0};
             {
@@ -1079,7 +1127,10 @@ class Viewport
                 ctx.fill(path);
             }
             if (item.comment) {
-                const center = {x: pointSum.x / item.points.length, y: pointSum.y / item.points.length};
+                const center = {
+                    x: pointSum.x / item.points.length,
+                    y: pointSum.y / item.points.length
+                };
                 let rsumx = 0, rsumy = 0;
                 for (let p of item.points) {
                     const vec = PointSub(center, p);
@@ -1096,22 +1147,28 @@ class Viewport
                 }
                 const qavgx = Math.sqrt(qsumx / item.points.length);
                 const qavgy = Math.sqrt(qsumy / item.points.length);
-                const radius = Math.min(ravgx - 0.5 * qavgx, ravgy - 0.5 * qavgy);
+                const radius =
+                    Math.min(ravgx - 0.5 * qavgx, ravgy - 0.5 * qavgy);
                 if (radius > 1) {
                     ctx.fillStyle = 'white';
-                    this.drawTextAtLine(ctx, PointSub(center, {x: radius*0.6, y:0}), PointAdd(center, {x: radius*0.6, y:0}), radius * 1.2, item.comment, 0.95, false);
+                    this.drawTextAtLine(
+                        ctx, PointSub(center, {x: radius * 0.6, y: 0}),
+                        PointAdd(center, {x: radius * 0.6, y: 0}), radius * 1.2,
+                        item.comment, 0.95, false);
                 }
             }
         }
     }
 
     refreshDrawingCanvas() {
-        let ctx = this.m_canvas.getContext("2d");
+        let ctx = this.m_canvas.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.m_canvas.width, this.m_canvas.height);
 
-        const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
-        ctx.setTransform(baseTrans.concat(this.m_transform).convertToDOMMatrix());
+        const baseTrans = new AffineTransformation(
+            1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
+        ctx.setTransform(
+            baseTrans.concat(this.m_transform).convertToDOMMatrix());
         for (let item of this.m_objectList) {
             if (this.m_objectFilter.match(item)) {
                 Viewport.drawItemInCanvas(ctx, item);
@@ -1122,11 +1179,14 @@ class Viewport
     }
 
     refreshCoordination() {
-        let ctx = this.m_coordinationBox.getContext("2d");
+        let ctx = this.m_coordinationBox.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, this.m_coordinationBox.width, this.m_coordinationBox.height);
+        ctx.clearRect(
+            0, 0, this.m_coordinationBox.width, this.m_coordinationBox.height);
 
-        const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
+        const baseTrans = new AffineTransformation(
+            1, 0, 0, -1, this.m_coordinationBox.width / 2,
+            this.m_coordinationBox.height / 2);
         const t = baseTrans.concat(this.m_transform);
         ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
         const w1 = this.m_coordinationBox.width / 2;
@@ -1136,10 +1196,10 @@ class Viewport
         const c = this.m_transform.revertXY({x: w1, y: h1});
         const d = this.m_transform.revertXY({x: w1, y: -h1});
         const un = 2 ** 30;
-        const k1 = { x: -un, y: 0 };
-        const k2 = { x: un, y: 0 };
-        const m1 = { x: 0, y: 0 - un };
-        const m2 = { x: 0, y: un };
+        const k1 = {x: -un, y: 0};
+        const k2 = {x: un, y: 0};
+        const m1 = {x: 0, y: 0 - un};
+        const m2 = {x: 0, y: un};
 
         const fn = (s1, s2) => {
             const ans = [];
@@ -1166,24 +1226,25 @@ class Viewport
             const path = new Path2D();
             path.lineTo(seg[0].x, seg[0].y);
             path.lineTo(seg[1].x, seg[1].y);
-            ctx.strokeStyle = "rgba(60, 60, 60, 0.5)";
+            ctx.strokeStyle = 'rgba(60, 60, 60, 0.5)';
             ctx.lineWidth = 1;
             ctx.stroke(path);
         }
     }
 
     drawSelection(start, to) {
-        let ctx = this.m_selectionBox.getContext("2d");
+        let ctx = this.m_selectionBox.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, this.m_selectionBox.width, this.m_selectionBox.height);
-        ctx.fillStyle = "rgba(93, 93, 255, 0.3)";
+        ctx.clearRect(
+            0, 0, this.m_selectionBox.width, this.m_selectionBox.height);
+        ctx.fillStyle = 'rgba(93, 93, 255, 0.3)';
         const width = Math.abs(to.x - start.x);
         const height = Math.abs(to.y - start.y);
         const minX = Math.min(start.x, to.x);
         const minY = Math.min(start.y, to.y)
         ctx.fillRect(minX, minY, width, height);
 
-        ctx.strokeStyle = "rgba(80, 80, 255, 0.8)";
+        ctx.strokeStyle = 'rgba(80, 80, 255, 0.8)';
         ctx.lineWidth = 2;
         const path = new Path2D();
         path.lineTo(start.x, start.y);
@@ -1201,22 +1262,24 @@ class Viewport
     drawSelectedItem(start, to) {
         if (start == null || to == null) {
             this.m_selectedItems = [];
-            objectDetailText.innerText = "";
-            objectDetailCount.innerText = "0";
+            objectDetailText.innerText = '';
+            objectDetailCount.innerText = '0';
         } else {
-            const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
+            const baseTrans = new AffineTransformation(
+                1, 0, 0, -1, this.m_coordinationBox.width / 2,
+                this.m_coordinationBox.height / 2);
             const t = baseTrans.concat(this.m_transform);
             const box = new BoundingBox(t.revertXY(start), t.revertXY(to));
             const bn = box.inflate(1);
             const polygon = new Polygon([
-                new Point(bn.minX, bn.minY),
-                new Point(bn.maxX, bn.minY),
-                new Point(bn.maxX, bn.maxY),
-                new Point(bn.minX, bn.maxY)
+                new Point(bn.minX, bn.minY), new Point(bn.maxX, bn.minY),
+                new Point(bn.maxX, bn.maxY), new Point(bn.minX, bn.maxY)
             ]);
             const rtreeCollide = this.m_objectRTree.search({
-                minX: box.getBL().x, minY: box.getBL().y,
-                maxX: box.getTR().x, maxY: box.getTR().y
+                minX: box.getBL().x,
+                minY: box.getBL().y,
+                maxX: box.getTR().x,
+                maxY: box.getTR().y
             });
             this.m_selectedItems = [];
             const objects = [];
@@ -1226,23 +1289,25 @@ class Viewport
                 }
                 const distance = polygon.distanceTo(item.object.shape());
                 const mindis = (item.object.width || 0) / 2;
-                if ( distance[0] <= mindis ||
-                     polygon.contains(item.object.shape()) ||
-                     (item.object.type == "polygon" && item.object.shape().contains(polygon)))
-                {
+                if (distance[0] <= mindis ||
+                    polygon.contains(item.object.shape()) ||
+                    (item.object.type == 'polygon' &&
+                     item.object.shape().contains(polygon))) {
                     this.m_selectedItems.push(item);
                     objects.push(item.object);
                 }
             }
             if (objects.length == 0) {
-                objectDetailText.innerText = "";
-                objectDetailCount.innerText = "0";
+                objectDetailText.innerText = '';
+                objectDetailCount.innerText = '0';
             } else {
                 objectDetailCount.innerText = objects.length;
-                objectDetailText.innerText = JSON.stringify(objects,
-                    (key, value) => {
-                        if (key=="m_shape") return undefined;
-                        else return value;
+                objectDetailText.innerText =
+                    JSON.stringify(objects, (key, value) => {
+                        if (key == 'm_shape')
+                            return undefined;
+                        else
+                            return value;
                     }, 2);
             }
         }
@@ -1259,18 +1324,22 @@ class Viewport
     }
 
     refreshSelection() {
-        let ctx = this.m_selectedItemsCanvas.getContext("2d");
+        let ctx = this.m_selectedItemsCanvas.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, this.m_selectedItemsCanvas.width, this.m_selectedItemsCanvas.height);
-        const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_coordinationBox.width / 2, this.m_coordinationBox.height / 2);
+        ctx.clearRect(
+            0, 0, this.m_selectedItemsCanvas.width,
+            this.m_selectedItemsCanvas.height);
+        const baseTrans = new AffineTransformation(
+            1, 0, 0, -1, this.m_coordinationBox.width / 2,
+            this.m_coordinationBox.height / 2);
         const t = baseTrans.concat(this.m_transform);
         ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
         for (let item of this.m_selectedItems) {
-            const obj = item["object"];
+            const obj = item['object'];
             const oldColor = obj.color;
             try {
-                obj.color = "rgba(200, 200, 230, 0.3)";
-                Viewport.drawItemInCanvas(ctx, item["object"]);
+                obj.color = 'rgba(200, 200, 230, 0.3)';
+                Viewport.drawItemInCanvas(ctx, item['object']);
             } finally {
                 obj.color = oldColor;
             }
@@ -1278,14 +1347,14 @@ class Viewport
     }
 
     clearSelection() {
-        let ctx = this.m_selectionBox.getContext("2d");
+        let ctx = this.m_selectionBox.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, this.m_selectionBox.width, this.m_selectionBox.height);
+        ctx.clearRect(
+            0, 0, this.m_selectionBox.width, this.m_selectionBox.height);
         this.drawSelectedItem(this.m_selectionStart, this.m_selectionTo);
     }
 
-    fitCanvas()
-    {
+    fitCanvas() {
         this.m_canvas.width = this.m_viewportEl.clientWidth;
         this.m_canvas.height = this.m_viewportEl.clientHeight;
         this.m_selectionBox.width = this.m_viewportEl.clientWidth;
@@ -1297,24 +1366,29 @@ class Viewport
         this.refreshDrawingCanvas();
     }
 
-    get paused() { return this.m_paused; }
-    get totalFrames() { return this.m_totalFrames; }
-    get currentFrame() { return this.m_currentFrame; }
+    get paused() {
+        return this.m_paused;
+    }
+    get totalFrames() {
+        return this.m_totalFrames;
+    }
+    get currentFrame() {
+        return this.m_currentFrame;
+    }
 
     canvasCoordToReal(point) {
-        const baseTrans = new AffineTransformation(1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
+        const baseTrans = new AffineTransformation(
+            1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
         const t = baseTrans.concat(this.m_transform);
         const ans = t.revertXY(point);
         return {x: Math.round(ans.x), y: Math.round(ans.y)};
     }
 
-    reset()
-    {
+    reset() {
         this.m_transform = AffineTransformation.identity();
         viewport.refreshDrawingCanvas();
     }
-    fitScreen()
-    {
+    fitScreen() {
         let box = null;
         for (let obj of this.m_objectList) {
             if (this.m_objectFilter.match(obj)) {
@@ -1329,61 +1403,49 @@ class Viewport
             }
         }
 
-        if (box == null)
-        {
+        if (box == null) {
             return;
         }
         box = box.inflate(10);
 
-        const boxviewport = new BoundingBox({
-            x: -this.m_canvas.width / 2,
-            y: -this.m_canvas.height/2
-        }, {
-            x: this.m_canvas.width / 2,
-            y: this.m_canvas.height/2
-        });
+        const boxviewport = new BoundingBox(
+            {x: -this.m_canvas.width / 2, y: -this.m_canvas.height / 2},
+            {x: this.m_canvas.width / 2, y: this.m_canvas.height / 2});
         this.m_transform = Box2boxTransformation(box, boxviewport);
         viewport.refreshDrawingCanvas();
     }
-    scaleUp(X, Y)
-    {
+    scaleUp(X, Y) {
         this.scale(1.1, 1.1, X, Y);
         this.refreshDrawingCanvas();
         this.refreshSelection();
     }
-    scaleDown(X, Y)
-    {
-        this.scale(1/1.1, 1/1.1, X, Y);
+    scaleDown(X, Y) {
+        this.scale(1 / 1.1, 1 / 1.1, X, Y);
         this.refreshDrawingCanvas();
         this.refreshSelection();
     }
-    moveLeft()
-    {
+    moveLeft() {
         this.translate(-50, 0);
-        this.refreshDrawingCanvas(); 
+        this.refreshDrawingCanvas();
         this.refreshSelection();
     }
-    moveRight()
-    {
+    moveRight() {
         this.translate(50, 0);
-        this.refreshDrawingCanvas(); 
+        this.refreshDrawingCanvas();
         this.refreshSelection();
     }
-    moveUp()
-    {
+    moveUp() {
         this.translate(0, 50);
-        this.refreshDrawingCanvas(); 
+        this.refreshDrawingCanvas();
         this.refreshSelection();
     }
-    moveDown()
-    {
+    moveDown() {
         this.translate(0, -50);
-        this.refreshDrawingCanvas(); 
+        this.refreshDrawingCanvas();
         this.refreshSelection();
     }
 
-    scale(scaleX, scaleY, _X, _Y)
-    {
+    scale(scaleX, scaleY, _X, _Y) {
         const X = _X || 0
         const Y = _Y || 0
         const xy = this.m_transform.applyXY({x: X, y: Y});
@@ -1395,32 +1457,29 @@ class Viewport
         this.m_transform = scaleAt.concat(this.m_transform);
     }
 
-    translate(X, Y)
-	{
+    translate(X, Y) {
         const v1 = this.m_transform.revertXY({x: X, y: Y});
         const v2 = this.m_transform.revertXY({x: 0, y: 0});
-        this.m_transform = this.m_transform.concat(new AffineTransformation(1, 0, 0, 1, v1.x - v2.x, v1.y - v2.y));
-	}
-
-    rotate(clockDegree)
-    {
-        const c = Math.cos(clockDegree / 180 * Math.PI);
-        const s = Math.sin(clockDegree / 180 * Math.PI);
-        this.m_transform = this.m_transform.concat(new AffineTransformation(c, s, -s, c, 0, 0));
+        this.m_transform = this.m_transform.concat(
+            new AffineTransformation(1, 0, 0, 1, v1.x - v2.x, v1.y - v2.y));
     }
 
-    play()
-    {
+    rotate(clockDegree) {
+        const c = Math.cos(clockDegree / 180 * Math.PI);
+        const s = Math.sin(clockDegree / 180 * Math.PI);
+        this.m_transform = this.m_transform.concat(
+            new AffineTransformation(c, s, -s, c, 0, 0));
+    }
+
+    play() {
         this.m_paused = false;
     }
 
-    pause()
-    {
+    pause() {
         this.m_paused = true;
     }
 
-    async setFrame(n)
-    {
+    async setFrame(n) {
         if (n > this.m_totalFrames - 1) return;
 
         if (currentFrame.valueAsNumber != n + 1) {
@@ -1440,18 +1499,13 @@ class Viewport
         this.refreshDrawingCanvas();
     }
 
-    init(box, totalFrames, loader)
-    {
+    init(box, totalFrames, loader) {
         this.m_currentFrame = 0;
         this.m_totalFrames = totalFrames;
         if (box) {
-            const boxviewport = new BoundingBox({
-                x: -this.m_canvas.width / 2,
-                y: -this.m_canvas.height/2
-            }, {
-                x: this.m_canvas.width / 2,
-                y: this.m_canvas.height/2
-            });
+            const boxviewport = new BoundingBox(
+                {x: -this.m_canvas.width / 2, y: -this.m_canvas.height / 2},
+                {x: this.m_canvas.width / 2, y: this.m_canvas.height / 2});
             this.m_transform = Box2boxTransformation(box, boxviewport);
         } else {
             this.m_transform = AffineTransformation.identity();
@@ -1483,9 +1537,9 @@ function toggleViewportStatus() {
 // update play/pause icon
 function updatePlayIcon() {
     if (viewport.paused) {
-        play.classList.add("playbtn")
+        play.classList.add('playbtn')
     } else {
-        play.classList.remove("playbtn")
+        play.classList.remove('playbtn')
     }
 }
 
@@ -1499,12 +1553,14 @@ function updateProgress() {
         progress.value = (currentFrame / Math.max(totalFrames - 1, 1)) * 100;
     }
 
-    timestamp.innerHTML = `${Math.min(currentFrame + 1, totalFrames)}/${totalFrames}`;
+    timestamp.innerHTML =
+        `${Math.min(currentFrame + 1, totalFrames)}/${totalFrames}`;
 }
 
 // Set viewport frame progress
 function setViewportProgress() {
-    viewport.setFrame(Math.round(progress.value * Math.max(viewport.totalFrames - 1, 0) / 100));
+    viewport.setFrame(Math.round(
+        progress.value * Math.max(viewport.totalFrames - 1, 0) / 100));
     updateProgress()
 }
 
@@ -1545,34 +1601,31 @@ let isInDragMode = false;
 let dragModePrevPt = {};
 let isInSelectionMode = false;
 let selectionStart = {};
-function enterDragMode(pt)
-{
+function enterDragMode(pt) {
     isInDragMode = true;
     dragModePrevPt = pt
-    fullviewport.classList.add("drag-mode");
+    fullviewport.classList.add('drag-mode');
 }
-function leaveDragMode()
-{
+function leaveDragMode() {
     isInDragMode = false;
-    fullviewport.classList.remove("drag-mode");
+    fullviewport.classList.remove('drag-mode');
 }
-function enterSelectionMode(pt)
-{
+function enterSelectionMode(pt) {
     isInSelectionMode = true;
     selectionStart = pt
-    fullviewport.classList.add("selection-mode");
+    fullviewport.classList.add('selection-mode');
     viewport.drawSelection(pt, pt);
 }
-function leaveSelectionMode()
-{
+function leaveSelectionMode() {
     isInSelectionMode = false;
-    fullviewport.classList.remove("selection-mode");
+    fullviewport.classList.remove('selection-mode');
     viewport.clearSelection();
 }
 
 fullviewport.addEventListener('mousemove', (e) => {
     if (isInDragMode) {
-        viewport.translate(e.offsetX - dragModePrevPt.x, dragModePrevPt.y - e.offsetY);
+        viewport.translate(
+            e.offsetX - dragModePrevPt.x, dragModePrevPt.y - e.offsetY);
         viewport.refreshDrawingCanvas();
         dragModePrevPt = {x: e.offsetX, y: e.offsetY};
     } else {
@@ -1580,7 +1633,8 @@ fullviewport.addEventListener('mousemove', (e) => {
         cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
 
         if (isInSelectionMode) {
-            viewport.drawSelection(selectionStart, {x: e.offsetX, y: e.offsetY});
+            viewport.drawSelection(
+                selectionStart, {x: e.offsetX, y: e.offsetY});
         }
     }
 });
@@ -1604,38 +1658,38 @@ fullviewport.addEventListener('mouseup', (e) => {
         leaveSelectionMode();
     }
 });
-fullviewport.addEventListener("contextmenu", (e) => {
+fullviewport.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     e.stopPropagation();
 });
 
 function hideInputBar() {
-    inputBar.classList.remove("input-bar-show");
+    inputBar.classList.remove('input-bar-show');
 }
 function showInputBar() {
-    inputBar.classList.add("input-bar-show");
+    inputBar.classList.add('input-bar-show');
     commandLineBar.focus();
-    commandLineBar.value = "";
+    commandLineBar.value = '';
 }
 
-commandLineBar.addEventListener("keyup", e => {
+commandLineBar.addEventListener('keyup', e => {
     e.stopPropagation();
 });
 const commandHistory = [];
 const localstorage = window.localStorage;
-if (localstorage.getItem("commandHistory")) {
-    commandHistory.push(...JSON.parse(localstorage.getItem("commandHistory")));
+if (localstorage.getItem('commandHistory')) {
+    commandHistory.push(...JSON.parse(localstorage.getItem('commandHistory')));
 }
 let historyIndex = -1;
 let tempCommand = '';
-commandLineBar.addEventListener("keydown", e => {
+commandLineBar.addEventListener('keydown', e => {
     e.stopPropagation();
     if (e.key == 'Escape') {
         hideInputBar();
     } else if (e.key == 'Enter') {
         viewport.executeCommand(commandLineBar.value.trim());
         commandHistory.push(commandLineBar.value.trim());
-        localstorage.setItem("commandHistory", JSON.stringify(commandHistory));
+        localstorage.setItem('commandHistory', JSON.stringify(commandHistory));
         hideInputBar();
     } else if (e.key == 'ArrowUp' || (e.key == 'p' && e.ctrlKey)) {
         if (historyIndex == -1 && commandHistory.length > 0) {
@@ -1666,18 +1720,18 @@ commandLineBar.addEventListener("keydown", e => {
     }
 });
 
-window.addEventListener("keyup", async (e) => {
+window.addEventListener('keyup', async (e) => {
     if (e.key == 'c') {
         showInputBar();
         historyIndex = -1;
         tempCommand = '';
     } else if (e.key == 'ArrowLeft') {
         if (viewport.currentFrame > 0) {
-            await viewport.setFrame(viewport.currentFrame-1);
+            await viewport.setFrame(viewport.currentFrame - 1);
             updateProgress();
         }
     } else if (e.key == 'ArrowRight') {
-        await viewport.setFrame(viewport.currentFrame+1);
+        await viewport.setFrame(viewport.currentFrame + 1);
         updateProgress();
     } else if (e.key == 'Escape') {
         viewport.clearSelection();
@@ -1688,52 +1742,53 @@ window.addEventListener("keyup", async (e) => {
     } else if (e.key == ' ') {
         toggleViewportStatus();
     } else if (e.key == 'i' && e.ctrlKey) {
-        objectDetail.classList.toggle("object-detail-show");
+        objectDetail.classList.toggle('object-detail-show');
     } else if (e.key == 'm' && e.ctrlKey) {
         viewport.m_objectFilter.toggleFilterViewer();
     }
 });
 
-async function setupConnection()
-{
-    const INFOAPI = location.protocol + "//" + location.host + "/data-info";
+async function setupConnection() {
+    const INFOAPI = location.protocol + '//' + location.host + '/data-info';
     const resp = await fetch(INFOAPI);
     const data = await resp.json();
     let box = null;
     let nframes = 0;
-    if (data["minxy"]) {
-        box = new BoundingBox(data["minxy"], data["maxxy"]);
-        nframes = data["nframes"];
+    if (data['minxy']) {
+        box = new BoundingBox(data['minxy'], data['maxxy']);
+        nframes = data['nframes'];
     }
 
     viewport.init(box, nframes, async (n) => {
-        const API = location.protocol + "//" + location.host + "/frame/" + n;
+        const API = location.protocol + '//' + location.host + '/frame/' + n;
         const resp = await fetch(API);
         const data = await resp.json();
-        return JSON.stringify(data["drawings"] || []);
+        return JSON.stringify(data['drawings'] || []);
     });
     updateProgress();
     updatePlayIcon();
 
-    framePerSec.addEventListener("change", () => {
+    framePerSec.addEventListener('change', () => {
         framePerSecondValue = framePerSec.valueAsNumber;
     });
-    currentFrame.addEventListener("change", () => {
-        viewport.setFrame(currentFrame.valueAsNumber-1);
+    currentFrame.addEventListener('change', () => {
+        viewport.setFrame(currentFrame.valueAsNumber - 1);
         updateProgress();
     });
     let framePerSecondValue = 1;
     let prevFresh = Date.now();
     while (true) {
         const now = Date.now();
-        const nextTimeout = Math.max(0, prevFresh + 1000 / framePerSecondValue - now);
+        const nextTimeout =
+            Math.max(0, prevFresh + 1000 / framePerSecondValue - now);
         await new Promise(r => setTimeout(r, nextTimeout));
         prevFresh = Date.now();
         if (!viewport.paused) {
             try {
-                await viewport.setFrame(viewport.currentFrame+1);
+                await viewport.setFrame(viewport.currentFrame + 1);
                 updateProgress();
-            } catch {}
+            } catch {
+            }
         }
     };
 }
