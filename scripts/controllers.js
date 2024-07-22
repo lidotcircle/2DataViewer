@@ -1,7 +1,10 @@
 const play = document.getElementById('play');
 const stop = document.getElementById('stop');
 const framePerSec = document.getElementById('frame-per-second');
+
+/** @type {HTMLInputElement} */
 const currentFrame = document.getElementById('current-frame');
+
 const commandLineBar = document.getElementById('command-line-input');
 const inputBar = document.getElementById('input-bar');
 const errorBar = document.getElementById('error-bar');
