@@ -1,10 +1,10 @@
-import {AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, PointAdd, PointSub} from './common.js';
-import {DrawItem} from './draw-item.js';
-import {Point, Polygon} from './flatten.js';
-import {ObjectFilter} from './object-filter.js';
-import RBush from './rbush.js';
-import {Observable, Subject} from './rxjs.js';
-import {parseTokens, tokenize} from './shape-parser.js';
+import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, PointAdd, PointSub } from './common.js';
+import { DrawItem } from './draw-item.js';
+import { Point, Polygon } from './thirdparty/flatten.js';
+import { ObjectFilter } from './object-filter.js';
+import RBush from './thirdparty/rbush.js';
+import { Observable, Subject } from './thirdparty/rxjs.js';
+import { parseTokens, tokenize } from './shape-parser.js';
 
 
 function splitString(input) {
@@ -30,9 +30,9 @@ const RTREE_ITEM_ID = Symbol('RTREE_ITEM_ID');
 class Viewport {
     constructor(canvasId) {
         this.m_viewportEl = document
-                                .getElementById(canvasId)
-                            /** @type HTMLCanvasElement */
-                            this.m_canvas =
+            .getElementById(canvasId)
+        /** @type HTMLCanvasElement */
+        this.m_canvas =
             this.m_viewportEl.querySelector('canvas.drawing');
         /** @type HTMLCanvasElement */
         this.m_selectionBox =
@@ -224,7 +224,7 @@ class Viewport {
         const pts = [];
         let match;
         while ((match = kregex.exec(args)) !== null) {
-            pts.push({x: parseInt(match[2]), y: parseInt(match[3])});
+            pts.push({ x: parseInt(match[2]), y: parseInt(match[3]) });
         }
 
         if (pts.length > 1) {
@@ -290,7 +290,7 @@ class Viewport {
         const diff = PointSub(from, to);
         const atanv = Math.atan(diff.y / (diff.x == 0 ? 1 : diff.x));
         const angle = diff.x == 0 ? (diff.y > 0 ? Math.PI / 2 : Math.PI * 1.5) :
-                                    (diff.x > 0 ? atanv : atanv + Math.PI);
+            (diff.x > 0 ? atanv : atanv + Math.PI);
         const textheight =
             m.actualBoundingBoxAscent - m.actualBoundingBoxDescent;
         const len = Math.sqrt(diff.x * diff.x + diff.y * diff.y);
@@ -300,11 +300,11 @@ class Viewport {
                 expectedHeight / textheight) *
             ratio;
         const t = AffineTransformation.translate(c.x / 2, c.y / 2)
-                      .concat(AffineTransformation.rotate(-angle + Math.PI))
-                      .concat(AffineTransformation.scale(s, s))
-                      .concat(AffineTransformation.translate(
-                          -m.width / 2, -textheight / 2))
-                      .concat(new AffineTransformation(1, 0, 0, -1, 0, 0));
+            .concat(AffineTransformation.rotate(-angle + Math.PI))
+            .concat(AffineTransformation.scale(s, s))
+            .concat(AffineTransformation.translate(
+                -m.width / 2, -textheight / 2))
+            .concat(new AffineTransformation(1, 0, 0, -1, 0, 0));
         ctx.setTransform(ctx.getTransform().multiply(t.convertToDOMMatrix()));
         ctx.fillText(text, 0, 0);
         ctx.restore();
@@ -339,8 +339,8 @@ class Viewport {
             if (item.comment) {
                 ctx.fillStyle = 'white';
                 this.drawTextAtLine(
-                    ctx, PointSub(item.center, {x: item.radius * 0.6, y: 0}),
-                    PointAdd(item.center, {x: item.radius * 0.6, y: 0}),
+                    ctx, PointSub(item.center, { x: item.radius * 0.6, y: 0 }),
+                    PointAdd(item.center, { x: item.radius * 0.6, y: 0 }),
                     item.radius * 1.2, item.comment, 0.95, false);
             }
         } else if (item.type == 'cline') {
@@ -378,7 +378,7 @@ class Viewport {
             }
         } else if (item.type == 'polygon') {
             ctx.fillStyle = item.color;
-            let pointSum = {x: 0, y: 0};
+            let pointSum = { x: 0, y: 0 };
             {
                 const path = new Path2D();
                 for (let p of item.points) {
@@ -415,8 +415,8 @@ class Viewport {
                 if (radius > 1) {
                     ctx.fillStyle = 'white';
                     this.drawTextAtLine(
-                        ctx, PointSub(center, {x: radius * 0.6, y: 0}),
-                        PointAdd(center, {x: radius * 0.6, y: 0}), radius * 1.2,
+                        ctx, PointSub(center, { x: radius * 0.6, y: 0 }),
+                        PointAdd(center, { x: radius * 0.6, y: 0 }), radius * 1.2,
                         item.comment, 0.95, false);
                 }
             }
@@ -454,15 +454,15 @@ class Viewport {
         ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
         const w1 = this.m_coordinationBox.width / 2;
         const h1 = this.m_coordinationBox.height / 2;
-        const a = this.m_transform.revertXY({x: -w1, y: -h1});
-        const b = this.m_transform.revertXY({x: -w1, y: h1});
-        const c = this.m_transform.revertXY({x: w1, y: h1});
-        const d = this.m_transform.revertXY({x: w1, y: -h1});
+        const a = this.m_transform.revertXY({ x: -w1, y: -h1 });
+        const b = this.m_transform.revertXY({ x: -w1, y: h1 });
+        const c = this.m_transform.revertXY({ x: w1, y: h1 });
+        const d = this.m_transform.revertXY({ x: w1, y: -h1 });
         const un = 2 ** 30;
-        const k1 = {x: -un, y: 0};
-        const k2 = {x: un, y: 0};
-        const m1 = {x: 0, y: 0 - un};
-        const m2 = {x: 0, y: un};
+        const k1 = { x: -un, y: 0 };
+        const k2 = { x: un, y: 0 };
+        const m1 = { x: 0, y: 0 - un };
+        const m2 = { x: 0, y: un };
 
         const fn = (s1, s2) => {
             const ans = [];
@@ -555,7 +555,7 @@ class Viewport {
                 if (distance[0] <= mindis ||
                     polygon.contains(item.object.shape()) ||
                     (item.object.type == 'polygon' &&
-                     item.object.shape().contains(polygon))) {
+                        item.object.shape().contains(polygon))) {
                     this.m_selectedItems.push(item);
                     objects.push(item.object);
                 }
@@ -644,7 +644,7 @@ class Viewport {
             1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
         const t = baseTrans.concat(this.m_transform);
         const ans = t.revertXY(point);
-        return {x: Math.round(ans.x), y: Math.round(ans.y)};
+        return { x: Math.round(ans.x), y: Math.round(ans.y) };
     }
 
     reset() {
@@ -672,8 +672,8 @@ class Viewport {
         box = box.inflate(10);
 
         const boxviewport = new BoundingBox(
-            {x: -this.m_canvas.width / 2, y: -this.m_canvas.height / 2},
-            {x: this.m_canvas.width / 2, y: this.m_canvas.height / 2});
+            { x: -this.m_canvas.width / 2, y: -this.m_canvas.height / 2 },
+            { x: this.m_canvas.width / 2, y: this.m_canvas.height / 2 });
         this.m_transform = Box2boxTransformation(box, boxviewport);
         this.refreshDrawingCanvas();
     }
@@ -711,7 +711,7 @@ class Viewport {
     scale(scaleX, scaleY, _X, _Y) {
         const X = _X || 0
         const Y = _Y || 0
-        const xy = this.m_transform.applyXY({x: X, y: Y});
+        const xy = this.m_transform.applyXY({ x: X, y: Y });
         const translation1 = new AffineTransformation(1, 0, 0, 1, -xy.x, -xy.y);
         const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, xy.x, xy.y);
@@ -721,8 +721,8 @@ class Viewport {
     }
 
     translate(X, Y) {
-        const v1 = this.m_transform.revertXY({x: X, y: Y});
-        const v2 = this.m_transform.revertXY({x: 0, y: 0});
+        const v1 = this.m_transform.revertXY({ x: X, y: Y });
+        const v2 = this.m_transform.revertXY({ x: 0, y: 0 });
         this.m_transform = this.m_transform.concat(
             new AffineTransformation(1, 0, 0, 1, v1.x - v2.x, v1.y - v2.y));
     }
@@ -764,8 +764,8 @@ class Viewport {
         this.m_totalFrames = totalFrames;
         if (box) {
             const boxviewport = new BoundingBox(
-                {x: -this.m_canvas.width / 2, y: -this.m_canvas.height / 2},
-                {x: this.m_canvas.width / 2, y: this.m_canvas.height / 2});
+                { x: -this.m_canvas.width / 2, y: -this.m_canvas.height / 2 },
+                { x: this.m_canvas.width / 2, y: this.m_canvas.height / 2 });
             this.m_transform = Box2boxTransformation(box, boxviewport);
         } else {
             this.m_transform = AffineTransformation.identity();
@@ -783,4 +783,4 @@ class Viewport {
     m_objectList;
 }
 
-export {Viewport};
+export { Viewport };

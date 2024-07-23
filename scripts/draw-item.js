@@ -1,5 +1,5 @@
-import {BoundingBox, PointAdd, PointSub} from './common.js';
-import {Circle, Point, Polygon, Segment} from './flatten.js';
+import { BoundingBox, PointAdd, PointSub } from './common.js';
+import { Circle, Point, Polygon, Segment } from './thirdparty/flatten.js';
 
 
 function toPoint(p) {
@@ -58,7 +58,7 @@ class DrawItem {
             const r = this.radius;
             const c = this.center;
             return new BoundingBox(
-                PointSub(c, {x: r, y: r}), PointAdd(c, {x: r, y: r}));
+                PointSub(c, { x: r, y: r }), PointAdd(c, { x: r, y: r }));
         } else if (this.type == 'line') {
             return new BoundingBox(this.point1, this.point2)
                 .inflate(this.width / 2);
@@ -110,4 +110,4 @@ class DrawItem {
 }
 
 
-export {DrawItem};
+export { DrawItem };

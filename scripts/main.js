@@ -1,6 +1,6 @@
-import {BoundingBox} from './common.js';
-import {commandLineBar, currentFrame, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, scaleDown, scaleUp, stop, timestamp} from './controllers.js';
-import {Viewport} from './viewport.js';
+import { BoundingBox } from './common.js';
+import { commandLineBar, currentFrame, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
+import { Viewport } from './viewport.js';
 
 
 function showError(msg) {
@@ -94,7 +94,7 @@ moveUp.addEventListener('click', () => viewport.moveUp());
 moveDown.addEventListener('click', () => viewport.moveDown());
 
 fullviewport.addEventListener('wheel', (e) => {
-    const pt = viewport.canvasCoordToReal({x: e.offsetX, y: e.offsetY});
+    const pt = viewport.canvasCoordToReal({ x: e.offsetX, y: e.offsetY });
     if (e.deltaY < 0) {
         viewport.scaleUp(pt.x, pt.y);
     } else if (e.deltaY > 0) {
@@ -132,23 +132,23 @@ fullviewport.addEventListener('mousemove', (e) => {
         viewport.translate(
             e.offsetX - dragModePrevPt.x, dragModePrevPt.y - e.offsetY);
         viewport.refreshDrawingCanvas();
-        dragModePrevPt = {x: e.offsetX, y: e.offsetY};
+        dragModePrevPt = { x: e.offsetX, y: e.offsetY };
     } else {
-        const pt = viewport.canvasCoordToReal({x: e.offsetX, y: e.offsetY});
+        const pt = viewport.canvasCoordToReal({ x: e.offsetX, y: e.offsetY });
         cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
 
         if (isInSelectionMode) {
             viewport.drawSelection(
-                selectionStart, {x: e.offsetX, y: e.offsetY});
+                selectionStart, { x: e.offsetX, y: e.offsetY });
         }
     }
 });
 fullviewport.addEventListener('mousedown', (e) => {
     if ((e.buttons & 4) != 0) {
-        enterDragMode({x: e.offsetX, y: e.offsetY});
+        enterDragMode({ x: e.offsetX, y: e.offsetY });
     }
     if ((e.buttons & 1) != 0) {
-        enterSelectionMode({x: e.offsetX, y: e.offsetY});
+        enterSelectionMode({ x: e.offsetX, y: e.offsetY });
     }
 });
 fullviewport.addEventListener('mouseleave', () => {

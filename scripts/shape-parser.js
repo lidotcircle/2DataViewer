@@ -15,9 +15,9 @@ function parseTokens(tokens) {
     }
 
     function parseShape(type) {
-        const shape = {type};
+        const shape = { type };
         while (currentTokenIndex < tokens.length &&
-               tokens[currentTokenIndex] !== ')') {
+            tokens[currentTokenIndex] !== ')') {
             nextToken();
             let key = nextToken();
             if (key === 'point' &&
@@ -28,7 +28,7 @@ function parseTokens(tokens) {
                 key === 'center') {
                 const x = parseFloat(nextToken());
                 const y = parseFloat(nextToken());
-                const value = {x, y};
+                const value = { x, y };
                 if (shape.type === 'polygon') {
                     shape.points = shape.points || [];
                     shape.points.push(value);
@@ -51,7 +51,7 @@ function parseTokens(tokens) {
         const token = nextToken();
         if (token === '(') {
             const k = nextToken();  // Skip 'scene' or shape type token, handled
-                                    // in parseShape
+            // in parseShape
             if (k !== 'scene') {
                 shapes.push(parseShape(k));
             }
@@ -101,4 +101,4 @@ function serializeShapes(shapes) {
 }
 
 
-export {tokenize, parseTokens, serializeShapes};
+export { tokenize, parseTokens, serializeShapes };

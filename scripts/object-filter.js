@@ -54,8 +54,7 @@ class KeyRegexFilter extends FilterRule {
     }
 
     toString(s) {
-        return `${this.enabled || s ? '' : '@'}${this.m_key}=/${
-            this.m_regex.source}/`;
+        return `${this.enabled || s ? '' : '@'}${this.m_key}=/${this.m_regex.source}/`;
     }
 }
 

@@ -1,9 +1,9 @@
 function PointAdd(p1, p2) {
-    return {x: p1.x + p2.x, y: p1.y + p2.y};
+    return { x: p1.x + p2.x, y: p1.y + p2.y };
 }
 
 function PointSub(p1, p2) {
-    return {x: p1.x - p2.x, y: p1.y - p2.y};
+    return { x: p1.x - p2.x, y: p1.y - p2.y };
 }
 
 class AffineTransformation {
@@ -48,7 +48,7 @@ class AffineTransformation {
     applyXY(point) {
         const x = this.a * point.x + this.b * point.y + this.tx;
         const y = this.c * point.x + this.d * point.y + this.ty;
-        return {x, y};
+        return { x, y };
     }
 
     revertXY(point) {
@@ -68,7 +68,7 @@ class AffineTransformation {
         const x = newA * point.x + newB * point.y + newTx;
         const y = newC * point.x + newD * point.y + newTy;
 
-        return {x, y};
+        return { x, y };
     }
 
     convertToDOMMatrix() {
@@ -97,7 +97,7 @@ class BoundingBox {
         const maxY = Math.max(this.maxY, point.y);
 
         // Return a new BoundingBox object with the updated coordinates
-        return new BoundingBox({x: minX, y: minY}, {x: maxX, y: maxY});
+        return new BoundingBox({ x: minX, y: minY }, { x: maxX, y: maxY });
     }
 
     mergeBox(box) {
@@ -106,8 +106,8 @@ class BoundingBox {
 
     move(vec) {
         return new BoundingBox(
-            {x: minX + vec.x, y: minY + vec.y},
-            {x: maxX + vec.x, y: maxY + vec.y});
+            { x: minX + vec.x, y: minY + vec.y },
+            { x: maxX + vec.x, y: maxY + vec.y });
     }
 
     // Method to check if a point is inside the bounding box
@@ -140,16 +140,16 @@ class BoundingBox {
 
     inflate(off) {
         return new BoundingBox(
-            PointSub(this.getBL(), {x: off, y: off}),
-            PointAdd(this.getTR(), {x: off, y: off}));
+            PointSub(this.getBL(), { x: off, y: off }),
+            PointAdd(this.getTR(), { x: off, y: off }));
     }
 
     getBL() {
-        return {x: this.minX, y: this.minY};
+        return { x: this.minX, y: this.minY };
     }
 
     getTR() {
-        return {x: this.maxX, y: this.maxY};
+        return { x: this.maxX, y: this.maxY };
     }
 }
 
@@ -217,9 +217,9 @@ function invertColor(color) {
 
 function findLineSegmentIntersection(A, B, C, D) {
     // Calculate differences
-    let diffBA = {x: B.x - A.x, y: B.y - A.y};
-    let diffDC = {x: D.x - C.x, y: D.y - C.y};
-    let diffCA = {x: C.x - A.x, y: C.y - A.y};
+    let diffBA = { x: B.x - A.x, y: B.y - A.y };
+    let diffDC = { x: D.x - C.x, y: D.y - C.y };
+    let diffCA = { x: C.x - A.x, y: C.y - A.y };
 
     // Determinant
     let det = diffBA.x * diffDC.y - diffBA.y * diffDC.x;
@@ -234,7 +234,7 @@ function findLineSegmentIntersection(A, B, C, D) {
     // Check if 0 <= t <= 1 and 0 <= u <= 1
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
         // Intersection point
-        return {x: A.x + t * diffBA.x, y: A.y + t * diffBA.y};
+        return { x: A.x + t * diffBA.x, y: A.y + t * diffBA.y };
     }
 
     return null;  // No intersection
