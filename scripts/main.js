@@ -1,5 +1,5 @@
 import { BoundingBox } from './common.js';
-import { commandLineBar, currentFrame, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
+import { commandLineBar, currentFrame, cursorBox, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
 import { Viewport } from './viewport.js';
 
 
@@ -93,8 +93,8 @@ moveRight.addEventListener('click', () => viewport.moveRight());
 moveUp.addEventListener('click', () => viewport.moveUp());
 moveDown.addEventListener('click', () => viewport.moveDown());
 
-fullviewport.addEventListener('wheel', (e) => {
-    const pt = viewport.canvasCoordToReal({ x: e.offsetX, y: e.offsetY });
+cursorBox.addEventListener('wheel', (e) => {
+    const pt = viewport.viewportCoordToReal({ x: e.offsetX, y: e.offsetY });
     if (e.deltaY < 0) {
         viewport.scaleUp(pt.x, pt.y);
     } else if (e.deltaY > 0) {
@@ -134,7 +134,7 @@ fullviewport.addEventListener('mousemove', (e) => {
         viewport.refreshDrawingCanvas();
         dragModePrevPt = { x: e.offsetX, y: e.offsetY };
     } else {
-        const pt = viewport.canvasCoordToReal({ x: e.offsetX, y: e.offsetY });
+        const pt = viewport.viewportCoordToReal({ x: e.offsetX, y: e.offsetY });
         cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
 
         if (isInSelectionMode) {

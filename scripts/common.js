@@ -71,9 +71,30 @@ class AffineTransformation {
         return { x, y };
     }
 
+    revert() {
+        const determinant = this.a * this.d - this.b * this.c;
+        if (determinant === 0) {
+            throw new Error('Transformation is not invertible.');
+        }
+
+        const invDet = 1 / determinant;
+        const newA = this.d * invDet;
+        const newB = -this.b * invDet;
+        const newC = -this.c * invDet;
+        const newD = this.a * invDet;
+        const newTx = (this.c * this.ty - this.d * this.tx) * invDet;
+        const newTy = (this.b * this.tx - this.a * this.ty) * invDet;
+
+        return new AffineTransformation(newA, newB, newC, newD, newTx, newTy);
+    }
+
     convertToDOMMatrix() {
         return new DOMMatrix(
             [this.a, this.b, this.c, this.d, this.tx, this.ty]);
+    }
+
+    convertToCSSMatrix() {
+        return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.tx}, ${this.ty})`;
     }
 }
 

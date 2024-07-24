@@ -1,10 +1,10 @@
 import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, PointAdd, PointSub } from './common.js';
 import { DrawItem } from './draw-item.js';
-import { Point, Polygon } from './thirdparty/flatten.js';
 import { ObjectFilter } from './object-filter.js';
+import { parseTokens, tokenize } from './shape-parser.js';
+import { Point, Polygon } from './thirdparty/flatten.js';
 import RBush from './thirdparty/rbush.js';
 import { Observable, Subject } from './thirdparty/rxjs.js';
-import { parseTokens, tokenize } from './shape-parser.js';
 
 
 function splitString(input) {
@@ -43,12 +43,29 @@ class Viewport {
         /** @type HTMLCanvasElement */
         this.m_coordinationBox =
             this.m_viewportEl.querySelector('canvas.coordination');
+
+        this.m_canvasList = [
+            this.m_canvas, this.m_selectionBox, this.m_selectedItemsCanvas,
+            this.m_coordinationBox
+        ];
+
+        /** @type HTMLDivElement */
+        this.m_canvasListElement =
+            this.m_viewportEl.querySelector('.canvas-list');
+
         this.m_objectFilter = new ObjectFilter('object-filter', () => {
             if (this.m_transform) {
                 this.refreshDrawingCanvas();
                 this.refreshSelection();
             }
         });
+
+        this.m_drawingRefreshCount = 0;
+        this.m_cssRfreshCount = 0;
+
+        this.m_baseScaleRatio = 1.8;
+        this.m_canvasTransform = AffineTransformation.identity();
+
         this.m_transform = AffineTransformation.identity();
         this.m_objectList = [];
         this.m_objectRTree = new RBush();
@@ -423,15 +440,45 @@ class Viewport {
         }
     }
 
+    checkCanvasTransform() {
+        if (this.isCanvasTransformValid()) {
+            this.updateCanvasCSSMatrix();
+            this.m_cssRfreshCount++;
+        } else {
+            this.applyCanvasTransformToTransform();
+            this.refreshDrawingCanvas();
+            this.m_drawingRefreshCount++;
+        }
+    }
+
+    applyCanvasTransformToTransform() {
+        this.m_transform = this.m_canvasTransform.concat(this.m_transform);
+        this.m_canvasTransform = AffineTransformation.identity();
+    }
+
+    updateCanvasCSSMatrix() {
+        const baseTrans = new AffineTransformation(
+            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
+        this.m_canvasListElement.style.transformOrigin = 'top left';
+        const ctransform =
+            baseTrans.concat(this.m_canvasTransform.concat(baseTrans.revert()));
+        this.m_canvasListElement.style.transform =
+            this.BaseCanvas2ViewportTransform.concat(ctransform)
+                .convertToCSSMatrix();
+    }
+
     refreshDrawingCanvas() {
+        const baseTrans = new AffineTransformation(
+            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
+        this.updateCanvasCSSMatrix();
+
         let ctx = this.m_canvas.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.m_canvas.width, this.m_canvas.height);
-
-        const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
-        ctx.setTransform(
-            baseTrans.concat(this.m_transform).convertToDOMMatrix());
+        ctx.setTransform(baseTrans.concat(this.m_transform)
+            .concat(AffineTransformation.scale(
+                this.m_baseScaleRatio, this.m_baseScaleRatio))
+            .convertToDOMMatrix());
         for (let item of this.m_objectList) {
             if (this.m_objectFilter.match(item)) {
                 Viewport.drawItemInCanvas(ctx, item);
@@ -617,15 +664,40 @@ class Viewport {
         this.drawSelectedItem(this.m_selectionStart, this.m_selectionTo);
     }
 
+    get viewportWidth() {
+        return this.m_viewportEl.clientWidth;
+    }
+
+    get viewportHeight() {
+        return this.m_viewportEl.clientHeight;
+    }
+
+    get canvasWidth() {
+        const scaleVal = this.m_baseScaleRatio * this.m_baseScaleRatio;
+        return this.viewportWidth * scaleVal;
+    }
+
+    get canvasHeight() {
+        const scaleVal = this.m_baseScaleRatio * this.m_baseScaleRatio;
+        return this.viewportHeight * scaleVal;
+    }
+
+    get BaseCanvas2ViewportTransform() {
+        const s = 1 / this.m_baseScaleRatio;
+        const deltax = (1 - this.m_baseScaleRatio) * this.viewportWidth / 2;
+        const deltay = (1 - this.m_baseScaleRatio) * this.viewportHeight / 2;
+        return new AffineTransformation(s, 0, 0, s, deltax, deltay);
+    }
+
     fitCanvas() {
-        this.m_canvas.width = this.m_viewportEl.clientWidth;
-        this.m_canvas.height = this.m_viewportEl.clientHeight;
-        this.m_selectionBox.width = this.m_viewportEl.clientWidth;
-        this.m_selectionBox.height = this.m_viewportEl.clientHeight;
-        this.m_selectedItemsCanvas.width = this.m_viewportEl.clientWidth;
-        this.m_selectedItemsCanvas.height = this.m_viewportEl.clientHeight;
-        this.m_coordinationBox.width = this.m_viewportEl.clientWidth;
-        this.m_coordinationBox.height = this.m_viewportEl.clientHeight;
+        const w = this.canvasWidth;
+        const h = this.canvasHeight;
+        this.m_canvasListElement.style.width = `${w}px`;
+        this.m_canvasListElement.style.height = `${h}px`;
+        for (let canvas of this.m_canvasList) {
+            canvas.width = w;
+            canvas.height = h;
+        }
         this.refreshDrawingCanvas();
     }
 
@@ -639,12 +711,47 @@ class Viewport {
         return this.m_currentFrame;
     }
 
-    canvasCoordToReal(point) {
+    viewportCoordToReal(point) {
         const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.m_canvas.width / 2, this.m_canvas.height / 2);
-        const t = baseTrans.concat(this.m_transform);
-        const ans = t.revertXY(point);
+            1, 0, 0, -1, this.viewportWidth / 2, this.viewportHeight / 2);
+        const scaleTransform = AffineTransformation.scale(
+            this.m_baseScaleRatio, this.m_baseScaleRatio);
+        const transform = baseTrans.concat(scaleTransform.revert())
+            .concat(this.qtransform)
+            .concat(scaleTransform);
+        const ans = transform.revertXY(point);
         return { x: Math.round(ans.x), y: Math.round(ans.y) };
+    }
+
+    viewportCoordToCanvas(point) {
+        const baseTrans = new AffineTransformation(
+            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
+        const ctransform = this.BaseCanvas2ViewportTransform
+            .concat(baseTrans)
+            .concat(this.m_canvasTransform)
+            .concat(baseTrans.revert());
+        return ctransform.revertXY(point);
+    }
+
+    isCanvasTransformValid() {
+        const a = this.viewportCoordToCanvas({ x: 0, y: 0 });
+        const b = this.viewportCoordToCanvas({ x: this.viewportWidth, y: 0 });
+        const c = this.viewportCoordToCanvas(
+            { x: this.viewportWidth, y: this.viewportHeight });
+        const d = this.viewportCoordToCanvas({ x: 0, y: this.viewportHeight });
+        const outerbox = new BoundingBox(
+            { x: 0, y: 0 }, { x: this.canvasWidth, y: this.canvasHeight });
+        const xa = (this.canvasWidth - this.viewportWidth) / 2;
+        const ya = (this.canvasHeight - this.viewportHeight) / 2;
+        const innerbox = new BoundingBox(
+            { x: xa, y: ya },
+            { x: xa + this.viewportWidth, y: ya + this.viewportHeight });
+
+        // FIXME rotation
+        return outerbox.containsPoint(a) && outerbox.containsPoint(b) &&
+            outerbox.containsPoint(c) && outerbox.containsPoint(d) &&
+            !innerbox.containsPoint(a) && !innerbox.containsPoint(b) &&
+            !innerbox.containsPoint(c) && !innerbox.containsPoint(d);
     }
 
     reset() {
@@ -652,6 +759,7 @@ class Viewport {
         this.refreshDrawingCanvas();
     }
     fitScreen() {
+        return;
         let box = null;
         for (let obj of this.m_objectList) {
             if (this.m_objectFilter.match(obj)) {
@@ -708,23 +816,38 @@ class Viewport {
         this.refreshSelection();
     }
 
+    get qtransform() {
+        return this.m_canvasTransform.concat(this.m_transform);
+    }
+
+    get qscaleTransform() {
+        const S = AffineTransformation.scale(
+            this.m_baseScaleRatio, this.m_baseScaleRatio);
+        return this.qtransform.concat(S);
+    }
+
     scale(scaleX, scaleY, _X, _Y) {
         const X = _X || 0
         const Y = _Y || 0
-        const xy = this.m_transform.applyXY({ x: X, y: Y });
+
+        const xy = this.qscaleTransform.applyXY({ x: X, y: Y });
         const translation1 = new AffineTransformation(1, 0, 0, 1, -xy.x, -xy.y);
         const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, xy.x, xy.y);
 
         const scaleAt = translation2.concat(scaling.concat(translation1));
-        this.m_transform = scaleAt.concat(this.m_transform);
+        this.m_canvasTransform = scaleAt.concat(this.m_canvasTransform);
+        this.checkCanvasTransform();
     }
 
     translate(X, Y) {
         const v1 = this.m_transform.revertXY({ x: X, y: Y });
         const v2 = this.m_transform.revertXY({ x: 0, y: 0 });
-        this.m_transform = this.m_transform.concat(
-            new AffineTransformation(1, 0, 0, 1, v1.x - v2.x, v1.y - v2.y));
+        this.m_canvasTransform =
+            new AffineTransformation(1, 0, 0, 1, v1.x - v2.x, v1.y - v2.y)
+                .concat(this.m_canvasTransform);
+        // this.m_transform = this.m_transform.concat(
+        //     new AffineTransformation(1, 0, 0, 1, v1.x - v2.x, v1.y - v2.y));
     }
 
     rotate(clockDegree) {
@@ -762,7 +885,7 @@ class Viewport {
     init(box, totalFrames, loader) {
         this.m_currentFrame = 0;
         this.m_totalFrames = totalFrames;
-        if (box) {
+        if (box && false) {
             const boxviewport = new BoundingBox(
                 { x: -this.m_canvas.width / 2, y: -this.m_canvas.height / 2 },
                 { x: this.m_canvas.width / 2, y: this.m_canvas.height / 2 });
