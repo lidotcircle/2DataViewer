@@ -1,5 +1,5 @@
 import { BoundingBox } from './common.js';
-import { commandLineBar, currentFrame, cursorBox, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
+import { commandLineBar, currentFrame, cursorBox, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, rotateLeftAtOrigin, rotateRightAtOrigin, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
 import { ObjectFilter } from './object-filter.js';
 import { Viewport } from './viewport.js';
 
@@ -87,8 +87,12 @@ progress.addEventListener('change', setViewportProgress);
 
 reset.addEventListener('click', () => viewport.Reset());
 fitScreen.addEventListener('click', () => viewport.FitScreen());
-scaleUp.addEventListener('click', () => viewport.ScaleUp());
-scaleDown.addEventListener('click', () => viewport.ScaleDown());
+scaleUp.addEventListener(
+    'click', () => viewport.ScaleUp(viewport.viewportCenter));
+scaleDown.addEventListener(
+    'click', () => viewport.ScaleDown(viewport.viewportCenter));
+rotateLeftAtOrigin.addEventListener('click', () => viewport.RotateAround(-45));
+rotateRightAtOrigin.addEventListener('click', () => viewport.RotateAround(45));
 moveLeft.addEventListener('click', () => viewport.MoveLeft());
 moveRight.addEventListener('click', () => viewport.MoveRight());
 moveUp.addEventListener('click', () => viewport.MoveUp());

@@ -600,9 +600,7 @@ class Viewport {
 
             let ctx = layerInfo.canvasElement.getContext('2d');
             ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.clearRect(
-                0, 0, this.m_defaultDrawingCanvas.width,
-                this.m_defaultDrawingCanvas.height);
+            ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
             ctx.setTransform(this.getCanvasDOMMatrixTransform());
 
             for (let item of layerInfo.objectList) {
@@ -617,56 +615,54 @@ class Viewport {
 
     /** @private */
     refreshCoordination() {
-        // TODO
-        let ctx = this.m_coordinationBox.getContext('2d');
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(
-            0, 0, this.m_coordinationBox.width, this.m_coordinationBox.height);
+        const w1 = this.canvasWidth / 2;
+        const h1 = this.canvasHeight / 2;
+        const pa = this.viewportCoordToReal({ x: -w1, y: -h1 });
+        const pb = this.viewportCoordToReal({ x: w1, y: -h1 });
+        const pc = this.viewportCoordToReal({ x: w1, y: h1 });
+        const pd = this.viewportCoordToReal({ x: -w1, y: h1 });
+        const abignum = 2 ** 30;
+        const horizLinePa = { x: -abignum, y: 0 };
+        const horizLinePb = { x: abignum, y: 0 };
+        const vertLinePa = { x: 0, y: 0 - abignum };
+        const vertLinePb = { x: 0, y: abignum };
 
-        const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.m_coordinationBox.width / 2,
-            this.m_coordinationBox.height / 2);
-        const t = baseTrans.concat(this.m_transform);
-        ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
-        const w1 = this.m_coordinationBox.width / 2;
-        const h1 = this.m_coordinationBox.height / 2;
-        const a = this.m_transform.revertXY({ x: -w1, y: -h1 });
-        const b = this.m_transform.revertXY({ x: -w1, y: h1 });
-        const c = this.m_transform.revertXY({ x: w1, y: h1 });
-        const d = this.m_transform.revertXY({ x: w1, y: -h1 });
-        const un = 2 ** 30;
-        const k1 = { x: -un, y: 0 };
-        const k2 = { x: un, y: 0 };
-        const m1 = { x: 0, y: 0 - un };
-        const m2 = { x: 0, y: un };
-
-        const fn = (s1, s2) => {
+        const lineToBoxIntersectionPoint = (a, b) => {
             const ans = [];
-            const u1 = findLineSegmentIntersection(s1, s2, a, b);
-            const u2 = findLineSegmentIntersection(s1, s2, b, c);
-            const u3 = findLineSegmentIntersection(s1, s2, c, d);
-            const u4 = findLineSegmentIntersection(s1, s2, d, a);
-            if (u1) ans.push(u1);
-            if (u2) ans.push(u2);
-            if (u3) ans.push(u3);
-            if (u4) ans.push(u4);
+            const ptOpt1 = findLineSegmentIntersection(a, b, pa, pb);
+            const ptOpt2 = findLineSegmentIntersection(a, b, pb, pc);
+            const ptOpt3 = findLineSegmentIntersection(a, b, pc, pd);
+            const ptOpt4 = findLineSegmentIntersection(a, b, pd, pa);
+            if (ptOpt1) ans.push(ptOpt1);
+            if (ptOpt2) ans.push(ptOpt2);
+            if (ptOpt3) ans.push(ptOpt3);
+            if (ptOpt4) ans.push(ptOpt4);
             if (ans.length >= 2) {
                 return ans.slice(0, 2);
             }
             return null;
         };
-        const s1 = fn(k1, k2);
-        const s2 = fn(m1, m2);
+        const hlineOpt = lineToBoxIntersectionPoint(horizLinePa, horizLinePb);
+        const vlineOpt = lineToBoxIntersectionPoint(vertLinePa, vertLinePb);
         const segs = [];
-        if (s1) segs.push(s1);
-        if (s2) segs.push(s2);
+        if (hlineOpt) segs.push(hlineOpt);
+        if (vlineOpt) segs.push(vlineOpt);
 
+        let ctx = this.m_coordinationBox.getContext('2d');
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        ctx.setTransform(this.getCanvasDOMMatrixTransform());
+        const p1 = this.viewportCoordToReal({ x: 0, y: 0 });
+        const p2 = this.viewportCoordToReal({ x: 50, y: 50 });
+        const vec = PointSub(p2, p1);
+        const vecLen = Math.sqrt(vec.x * vec.x + vec.y * vec.y);
+        const lineWidth = Math.ceil(vecLen / 50);
         for (let seg of segs) {
             const path = new Path2D();
             path.lineTo(seg[0].x, seg[0].y);
             path.lineTo(seg[1].x, seg[1].y);
             ctx.strokeStyle = 'rgba(60, 60, 60, 0.5)';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = lineWidth;
             ctx.stroke(path);
         }
     }
@@ -828,6 +824,17 @@ class Viewport {
     }
 
     /** @private */
+    realCoordToViewport(point) {
+        const baseTrans = new AffineTransformation(
+            1, 0, 0, -1, this.viewportWidth / 2, this.viewportHeight / 2);
+        const transform = baseTrans.concat(this.stransform.revert())
+            .concat(this.qtransform)
+            .concat(this.stransform);
+        const ans = transform.applyXY(point);
+        return { x: Math.round(ans.x), y: Math.round(ans.y) };
+    }
+
+    /** @private */
     viewportCoordToCanvas(point) {
         const baseTrans = new AffineTransformation(
             1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
@@ -879,18 +886,29 @@ class Viewport {
     /**
      * @param scaleX { float }
      * @param scaleY { float }
-     * @param _X { float }
-     * @param _Y { float }
+     * @param X { float }
+     * @param Y { float }
      * @private
      */
-    scale(scaleX, scaleY, _X, _Y) {
-        const X = _X || 0
-        const Y = _Y || 0
-
+    scale(scaleX, scaleY, X, Y) {
         const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
         const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
         this.applyTransformToReal(translation2.concat(scaling.concat(translation1)));
+    }
+
+    /**
+     * @param scaleX { float }
+     * @param scaleY { float }
+     * @param X { float }
+     * @param Y { float }
+     * @private
+     */
+    scaleInViewport(scaleX, scaleY, X, Y) {
+        const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
+        const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
+        const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
+        this.applyTransformToViewport(translation2.concat(scaling.concat(translation1)));
     }
 
     /**
@@ -908,9 +926,7 @@ class Viewport {
      * @private
      */
     translateInViewport(X, Y) {
-        const p1 = this.viewportCoordToReal({ x: 0, y: 0 });
-        const p2 = this.viewportCoordToReal({ x: X, y: Y });
-        this.translate(p2.x - p1.x, p2.y - p1.y);
+        this.applyTransformToViewport(AffineTransformation.translate(X, Y));
     }
 
     /**
@@ -926,6 +942,33 @@ class Viewport {
         const rotation = new AffineTransformation(c, s, -s, c, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
         this.applyTransformToReal(translation2.concat(rotation.concat(translation1)));
+    }
+
+    /**
+     * @param clockwiseDegree { float }
+     * @param X { float }
+     * @param Y { float }
+     * @private
+     */
+    rotateAtToViewport(clockwiseDegree, X, Y) {
+        const c = Math.cos(-clockwiseDegree / 180 * Math.PI);
+        const s = Math.sin(-clockwiseDegree / 180 * Math.PI);
+        const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
+        const rotation = new AffineTransformation(c, s, -s, c, 0, 0);
+        const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
+        this.applyTransformToViewport(translation2.concat(rotation.concat(translation1)));
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @private
+     */
+    applyTransformToViewport(transform) {
+        const t = this.BaseCanvas2ViewportTransform.concat(new AffineTransformation(
+            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2));
+        const tn = t.revert().concat(transform).concat(t);
+        this.m_canvasTransform = tn.concat(this.m_canvasTransform);
+        this.checkCanvasTransform();
     }
 
     /**
@@ -1045,17 +1088,23 @@ class Viewport {
     }
     /** @public */
     ScaleUp(X, Y) {
-        X = X || 0;
-        Y = Y || 0;
-        const pt = this.viewportCoordToReal({ x: X, y: Y });
-        this.scale(1.1, 1.1, pt.x, pt.y);
+        if (X && X.x && X.y) {
+            Y = X.y;
+            X = X.x;
+        }
+        X = X || this.viewportCenter.x;
+        Y = Y || this.viewportCenter.y;
+        this.scaleInViewport(1.1, 1.1, X, Y);
     }
     /** @public */
     ScaleDown(X, Y) {
-        X = X || 0;
-        Y = Y || 0;
-        const pt = this.viewportCoordToReal({ x: X, y: Y });
-        this.scale(1 / 1.1, 1 / 1.1, pt.x, pt.y);
+        if (X && X.x && X.y) {
+            Y = X.y;
+            X = X.x;
+        }
+        X = X || this.viewportCenter.x;
+        Y = Y || this.viewportCenter.y;
+        this.scaleInViewport(1 / 1.1, 1 / 1.1, X, Y);
     }
     /** @public */
     MoveLeft() {
@@ -1073,12 +1122,17 @@ class Viewport {
     MoveDown() {
         this.translateInViewport(0, 50);
     }
+
     /** @public */
     RotateAround(clockwiseDegree, X, Y) {
+        if (X && X.x && X.y) {
+            Y = X.y;
+            X = X.x;
+        }
         X = X || 0;
         Y = Y || 0;
-        const pt = this.viewportCoordToReal({ x: X, y: Y });
-        this.rotateAt(clockwiseDegree, pt.x, pt.y);
+        const pt = this.realCoordToViewport({ x: X, y: Y });
+        this.rotateAtToViewport(clockwiseDegree, pt.x, pt.y);
     }
 
     /** @public */
@@ -1127,6 +1181,15 @@ class Viewport {
         }
     }
 
+    /**
+     * @public
+     * @param { { x: float, y: float } } point
+     * @returns { { x: float, y: float } }
+     */
+    ViewportCoordToGlobalCoord(point) {
+        return this.viewportCoordToReal(point);
+    }
+
     /** @public */
     get frameCountObservable() {
         return this.m_frameCountObservable;
@@ -1140,6 +1203,22 @@ class Viewport {
     /** @public */
     get selectedItemsTextObservable() {
         return this.m_selectedItemsTextObservable;
+    }
+
+    /**
+     * @return { { x: float, y: float } }
+     * @public
+     */
+    get viewportCenter() {
+        return { x: this.viewportWidth / 2, y: this.viewportHeight / 22 };
+    }
+
+    /**
+     * @return { { x: float, y: float } }
+     * @public
+     */
+    get viewportCenterToGlobal() {
+        return this.viewportCoordToReal(this.viewportCenter);
     }
 
     /** @public */

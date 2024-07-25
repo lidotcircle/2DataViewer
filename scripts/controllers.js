@@ -16,6 +16,8 @@ const fitScreen = document.getElementById('fit-screen');
 const reset = document.getElementById('reset');
 const scaleUp = document.getElementById('scale-up');
 const scaleDown = document.getElementById('scale-down');
+const rotateLeftAtOrigin = document.getElementById('rotate-ccw-at-origin');
+const rotateRightAtOrigin = document.getElementById('rotate-cw-at-origin');
 const moveLeft = document.getElementById('move-left');
 const moveRight = document.getElementById('move-right');
 const moveUp = document.getElementById('move-up');
@@ -42,6 +44,8 @@ export {
     reset,
     scaleUp,
     scaleDown,
+    rotateLeftAtOrigin,
+    rotateRightAtOrigin,
     moveLeft,
     moveRight,
     moveUp,
