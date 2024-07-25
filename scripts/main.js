@@ -1,5 +1,6 @@
 import { BoundingBox } from './common.js';
 import { commandLineBar, currentFrame, cursorBox, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
+import { ObjectFilter } from './object-filter.js';
 import { Viewport } from './viewport.js';
 
 
@@ -9,7 +10,7 @@ function showError(msg) {
     setTimeout(() => errorBar.classList.remove('error-bar-show'), 2000);
 }
 
-const viewport = new Viewport('viewport');
+const viewport = new Viewport('viewport', new ObjectFilter('object-filter'));
 
 viewport.frameCountObservable.subscribe((n) => {
     if (currentFrame.valueAsNumber != n) {
@@ -31,17 +32,17 @@ viewport.errorObservable.subscribe((msg) => {
 
 // Play & pause player
 function toggleViewportStatus() {
-    if (viewport.paused) {
-        viewport.play();
+    if (viewport.Paused) {
+        viewport.Play();
     } else {
-        viewport.pause();
+        viewport.Pause();
     }
     updatePlayIcon();
 }
 
 // update play/pause icon
 function updatePlayIcon() {
-    if (viewport.paused) {
+    if (viewport.Paused) {
         play.classList.add('playbtn')
     } else {
         play.classList.remove('playbtn')
@@ -50,8 +51,8 @@ function updatePlayIcon() {
 
 // Update progress & timestamp
 function updateProgress() {
-    const totalFrames = viewport.totalFrames;
-    const currentFrame = viewport.currentFrame;
+    const totalFrames = viewport.TotalFrames;
+    const currentFrame = viewport.CurrentFrame;
     if (totalFrames == 1) {
         progress.value = 100;
     } else {
@@ -64,15 +65,15 @@ function updateProgress() {
 
 // Set viewport frame progress
 function setViewportProgress() {
-    viewport.setFrame(Math.round(
-        progress.value * Math.max(viewport.totalFrames - 1, 0) / 100));
+    viewport.GotoFrame(Math.round(
+        progress.value * Math.max(viewport.TotalFrames - 1, 0) / 100));
     updateProgress()
 }
 
 // Stop player
 function stopViewport() {
-    viewport.setFrame(0);
-    viewport.pause();
+    viewport.GotoFrame(0);
+    viewport.Pause();
     updatePlayIcon();
     updateProgress();
 }
@@ -84,21 +85,20 @@ stop.addEventListener('click', stopViewport);
 
 progress.addEventListener('change', setViewportProgress);
 
-reset.addEventListener('click', () => viewport.reset());
-fitScreen.addEventListener('click', () => viewport.fitScreen());
-scaleUp.addEventListener('click', () => viewport.scaleUp());
-scaleDown.addEventListener('click', () => viewport.scaleDown());
-moveLeft.addEventListener('click', () => viewport.moveLeft());
-moveRight.addEventListener('click', () => viewport.moveRight());
-moveUp.addEventListener('click', () => viewport.moveUp());
-moveDown.addEventListener('click', () => viewport.moveDown());
+reset.addEventListener('click', () => viewport.Reset());
+fitScreen.addEventListener('click', () => viewport.FitScreen());
+scaleUp.addEventListener('click', () => viewport.ScaleUp());
+scaleDown.addEventListener('click', () => viewport.ScaleDown());
+moveLeft.addEventListener('click', () => viewport.MoveLeft());
+moveRight.addEventListener('click', () => viewport.MoveRight());
+moveUp.addEventListener('click', () => viewport.MoveUp());
+moveDown.addEventListener('click', () => viewport.MoveDown());
 
 cursorBox.addEventListener('wheel', (e) => {
-    const pt = viewport.viewportCoordToReal({ x: e.offsetX, y: e.offsetY });
     if (e.deltaY < 0) {
-        viewport.scaleUp(pt.x, pt.y);
+        viewport.ScaleUp(e.offsetX, e.offsetY);
     } else if (e.deltaY > 0) {
-        viewport.scaleDown(pt.x, pt.y);
+        viewport.ScaleDown(e.offsetX, e.offsetY);
     }
 });
 
@@ -119,7 +119,7 @@ function enterSelectionMode(pt) {
     isInSelectionMode = true;
     selectionStart = pt
     fullviewport.classList.add('selection-mode');
-    viewport.drawSelection(pt, pt);
+    viewport.SelectBoxInViewport(pt, pt);
 }
 function leaveSelectionMode() {
     isInSelectionMode = false;
@@ -129,8 +129,8 @@ function leaveSelectionMode() {
 
 fullviewport.addEventListener('mousemove', (e) => {
     if (isInDragMode) {
-        viewport.translate(
-            e.offsetX - dragModePrevPt.x, dragModePrevPt.y - e.offsetY);
+        viewport.translateInViewport(
+            e.offsetX - dragModePrevPt.x, e.offsetY - dragModePrevPt.y);
         viewport.refreshDrawingCanvas();
         dragModePrevPt = { x: e.offsetX, y: e.offsetY };
     } else {
@@ -138,7 +138,7 @@ fullviewport.addEventListener('mousemove', (e) => {
         cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
 
         if (isInSelectionMode) {
-            viewport.drawSelection(
+            viewport.SelectBoxInViewport(
                 selectionStart, { x: e.offsetX, y: e.offsetY });
         }
     }
@@ -192,7 +192,7 @@ commandLineBar.addEventListener('keydown', e => {
     if (e.key == 'Escape') {
         hideInputBar();
     } else if (e.key == 'Enter') {
-        viewport.executeCommand(commandLineBar.value.trim());
+        viewport.ExecuteCommand(commandLineBar.value.trim());
         commandHistory.push(commandLineBar.value.trim());
         localstorage.setItem('commandHistory', JSON.stringify(commandHistory));
         hideInputBar();
@@ -231,12 +231,12 @@ window.addEventListener('keyup', async (e) => {
         historyIndex = -1;
         tempCommand = '';
     } else if (e.key == 'ArrowLeft') {
-        if (viewport.currentFrame > 0) {
-            await viewport.setFrame(viewport.currentFrame - 1);
+        if (viewport.CurrentFrame > 0) {
+            await viewport.GotoFrame(viewport.CurrentFrame - 1);
             updateProgress();
         }
     } else if (e.key == 'ArrowRight') {
-        await viewport.setFrame(viewport.currentFrame + 1);
+        await viewport.GotoFrame(viewport.CurrentFrame + 1);
         updateProgress();
     } else if (e.key == 'Escape') {
         viewport.clearSelection();
@@ -264,7 +264,7 @@ async function setupConnection() {
         nframes = data['nframes'];
     }
 
-    viewport.init(box, nframes, async (n) => {
+    viewport.SetDataSource(box, nframes, async (n) => {
         const API = location.protocol + '//' + location.host + '/frame/' + n;
         const resp = await fetch(API);
         const data = await resp.json();
@@ -277,7 +277,7 @@ async function setupConnection() {
         framePerSecondValue = framePerSec.valueAsNumber;
     });
     currentFrame.addEventListener('change', () => {
-        viewport.setFrame(currentFrame.valueAsNumber - 1);
+        viewport.GotoFrame(currentFrame.valueAsNumber - 1);
         updateProgress();
     });
     let framePerSecondValue = 1;
@@ -288,9 +288,9 @@ async function setupConnection() {
             Math.max(0, prevFresh + 1000 / framePerSecondValue - now);
         await new Promise(r => setTimeout(r, nextTimeout));
         prevFresh = Date.now();
-        if (!viewport.paused) {
+        if (!viewport.Paused) {
             try {
-                await viewport.setFrame(viewport.currentFrame + 1);
+                await viewport.GotoFrame(viewport.CurrentFrame + 1);
                 updateProgress();
             } catch {
             }

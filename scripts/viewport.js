@@ -26,56 +26,175 @@ function splitString(input) {
 }
 
 
+const DETAULT_LAYER_NAME = 'default';
 const RTREE_ITEM_ID = Symbol('RTREE_ITEM_ID');
+
+class ViewportDrawingLayer {
+    /**
+     * @param {string} layerName
+     * @param {HTMLCanvasElement} canvasElement
+     */
+    constructor(layerName, canvasElement) {
+        this.m_layerName = layerName;
+        /** @type DrawItem[] */
+        this.m_objectList = [];
+        this.m_objectRTree = new RBush();
+        this.m_canvasElement = canvasElement;
+        this.m_dirty = true;
+    }
+
+    get layerName() {
+        return this.m_layerName;
+    }
+
+    get canvasElement() {
+        return this.m_canvasElement;
+    }
+
+    get objectList() {
+        return this.m_objectList;
+    }
+
+    get isDirty() {
+        return this.m_dirty;
+    }
+
+    markDirty() {
+        this.m_dirty = true;
+    }
+
+    markClean() {
+        this.m_dirty = false;
+    }
+
+    addDrawingObject(obj) {
+        this.m_objectList.push(obj);
+        const box = obj.getBox();
+        const item = {
+            minX: box.getBL().x,
+            minY: box.getBL().y,
+            maxX: box.getTR().x,
+            maxY: box.getTR().y,
+            object: obj
+        };
+        this.m_objectRTree.insert(item);
+        obj[RTREE_ITEM_ID] = item;
+        this.markDirty();
+    }
+
+    removeDrawingObject(obj) {
+        const idx = this.m_objectList.indexOf(obj);
+        if (idx != -1) {
+            this.m_objectList.splice(idx, 1);
+            const item = obj[RTREE_ITEM_ID];
+            if (item != null) {
+                this.m_objectRTree.remove(item);
+            }
+        }
+        this.markDirty();
+    }
+
+    clear() {
+        this.m_objectList = [];
+        this.m_objectRTree.clear();
+        this.markDirty();
+    }
+
+    /**
+     * @param {BoundingBox} boxviewport
+     * @param {(item: { object: DrawItem }) => boolean} filter
+     * @returns {DrawItem[]}
+     */
+    collideWithBox(box, filter) {
+        const bn = box.inflate(1);
+        const polygon = new Polygon([
+            new Point(bn.minX, bn.minY), new Point(bn.maxX, bn.minY),
+            new Point(bn.maxX, bn.maxY), new Point(bn.minX, bn.maxY)
+        ]);
+        const rtreeCollide = this.m_objectRTree.search({
+            minX: box.getBL().x,
+            minY: box.getBL().y,
+            maxX: box.getTR().x,
+            maxY: box.getTR().y
+        });
+        const objects = [];
+        for (let item of rtreeCollide) {
+            if (filter && !filter(item.object)) {
+                continue;
+            }
+            const distance = polygon.distanceTo(item.object.shape());
+            const mindis = (item.object.width || 0) / 2;
+            if (distance[0] <= mindis ||
+                polygon.contains(item.object.shape()) ||
+                (item.object.type == 'polygon' &&
+                    item.object.shape().contains(polygon))) {
+                objects.push(item.object);
+            }
+        }
+        return objects;
+    }
+};
+
 class Viewport {
-    constructor(canvasId) {
-        this.m_viewportEl = document
-            .getElementById(canvasId)
-        /** @type HTMLCanvasElement */
-        this.m_canvas =
-            this.m_viewportEl.querySelector('canvas.drawing');
-        /** @type HTMLCanvasElement */
-        this.m_selectionBox =
-            this.m_viewportEl.querySelector('canvas.selection-box');
-        /** @type HTMLCanvasElement */
-        this.m_selectedItemsCanvas =
-            this.m_viewportEl.querySelector('canvas.selection');
-        /** @type HTMLCanvasElement */
-        this.m_coordinationBox =
-            this.m_viewportEl.querySelector('canvas.coordination');
-
-        this.m_canvasList = [
-            this.m_canvas, this.m_selectionBox, this.m_selectedItemsCanvas,
-            this.m_coordinationBox
-        ];
-
+    /**
+     * @param {string} canvasId
+     * @param {ObjectFilter} objectFilter
+     */
+    constructor(canvasId, objectFilter) {
         /** @type HTMLDivElement */
-        this.m_canvasListElement =
-            this.m_viewportEl.querySelector('.canvas-list');
+        this.m_viewportEl = document.getElementById(canvasId);
+        this.m_viewportEl.style.width = '100%';
+        this.m_viewportEl.style.height = '100%';
+        this.m_viewportEl.style.background = '#2c2929';
 
-        this.m_objectFilter = new ObjectFilter('object-filter', () => {
-            if (this.m_transform) {
+        while (this.m_viewportEl.lastChild) {
+            this.m_viewportEl.removeChild(this.m_viewportEl.lastChild);
+        }
+
+        this.m_defaultDrawingCanvas = document.createElement('canvas');
+        this.m_selectionBox = document.createElement('canvas');
+        this.m_selectedItemsCanvas = document.createElement('canvas');
+        this.m_coordinationBox = document.createElement('canvas');
+
+        this.m_canvasListElement = document.createElement('div');
+        this.m_canvasListElement.style.position = 'relative';
+        this.m_canvasListElement.style.transformOrigin = 'top left';
+
+        const canvasList = [
+            this.m_defaultDrawingCanvas, this.m_selectionBox,
+            this.m_selectedItemsCanvas, this.m_coordinationBox
+        ];
+        for (let canvas of canvasList) {
+            this.m_canvasListElement.appendChild(canvas);
+        }
+        this.m_viewportEl.appendChild(this.m_canvasListElement);
+
+
+        this.m_baseScaleRatio = 1.8;
+        this.m_canvasTransform = AffineTransformation.identity();
+        this.m_transform = AffineTransformation.identity();
+        this.m_drawingRefreshCount = 0;
+        this.m_cssRfreshCount = 0;
+
+
+        this.m_objectFilter = objectFilter;
+        this.m_objectFilter.layerChangeObservable.subscribe(() => {
+            if (this.m_layerList) {
                 this.refreshDrawingCanvas();
                 this.refreshSelection();
             }
         });
 
-        this.m_drawingRefreshCount = 0;
-        this.m_cssRfreshCount = 0;
+        this.m_layerList = [
+            new ViewportDrawingLayer(DETAULT_LAYER_NAME, this.m_defaultDrawingCanvas)
+        ];
+        this.updateCanvasCSSAndProperties();
 
-        this.m_baseScaleRatio = 1.8;
-        this.m_canvasTransform = AffineTransformation.identity();
-
-        this.m_transform = AffineTransformation.identity();
-        this.m_objectList = [];
-        this.m_objectRTree = new RBush();
         this.m_viewportConfig = {
             'default_width': 1,
             'default_color': 'rgba(99, 99, 99, 0.99)',
             'default_background': '#2c2929',
         };
-        window.addEventListener('resize', () => this.fitCanvas());
-        this.fitCanvas();
 
         this.m_frameCountSubject = new Subject();
         this.m_frameCountObservable = new Observable(subscriber => {
@@ -89,120 +208,108 @@ class Viewport {
         this.m_selectedItemsTextObservable = new Observable(subscriber => {
             this.m_selectedItemsTextSubject.subscribe(subscriber);
         });
-
         this.m_errorSubject = new Subject();
         this.m_errorObservable = new Observable(subscriber => {
             this.m_errorSubject.subscribe(subscriber);
         });
+
+        window.addEventListener('resize', () => this.onViewportResize());
+        this.onViewportResize();
+
+        this.m_loader = async (_) => [];
+        this.m_paused = true;
+        this.m_currentFrame = 0;
+        this.m_totalFrames = 1;
     }
 
-    get frameCountObservable() {
-        return this.m_frameCountObservable;
+    /**
+     * @param {HTMLCanvasElement} canvasId
+     * @private
+     */
+    setCanvasStyle(canvas) {
+        canvas.style.position = 'absolute';
+        canvas.style.left = '0';
+        canvas.style.top = '0';
     }
 
-    get selectedItemsCountObservable() {
-        return this.m_selectedItemsCountObservable;
+    /** @private */
+    get canvasList() {
+        const ans = [];
+        ans.push(this.m_coordinationBox);
+        for (let i = 0; i < this.m_layerList.length; i++) {
+            const k = this.m_layerList.length - i - 1;
+            ans.push(this.m_layerList[k].canvasElement);
+        }
+        ans.push(this.m_selectionBox);
+        ans.push(this.m_selectedItemsCanvas);
+        return ans;
     }
 
-    get selectedItemsTextObservable() {
-        return this.m_selectedItemsTextObservable;
+    updateCanvasCSSAndProperties() {
+        for (let i = 0; i < this.canvasList.length; i++) {
+            const canvas = this.canvasList[i];
+            canvas.style.zIndex = i;
+            this.setCanvasStyle(canvas);
+            canvas.width = this.canvasWidth;
+            canvas.height = this.canvasHeight;
+        }
     }
 
-    get errorObservable() {
-        return this.m_errorObservable;
-    }
-
+    /** @private */
     showError(msg) {
         this.m_errorSubject.next(msg);
     }
 
     addDrawingObject(obj) {
-        this.m_objectList.push(obj);
         if (obj.color == null) {
             obj.color = this.m_viewportConfig.default_color;
         }
         if ((obj.type == 'cline' || obj.type == 'line') && obj.width == null) {
             obj.width = this.m_viewportConfig.default_width;
         }
-        if (obj.layer) {
+        obj.layer = obj.layer || DETAULT_LAYER_NAME;
+        let layerInfo = this.m_layerList.find(
+            layerInfo => layerInfo.layerName == obj.layer);
+        if (layerInfo == null) {
             this.m_objectFilter.touchLayer(obj.layer);
+            layerInfo = new ViewportDrawingLayer(
+                obj.layer, document.createElement('canvas'));
+            this.m_layerList.push(layerInfo);
+            this.m_canvasListElement.appendChild(layerInfo.canvasElement);
+            this.updateCanvasCSSAndProperties();
         }
-        const box = obj.getBox();
-        const item = {
-            minX: box.getBL().x,
-            minY: box.getBL().y,
-            maxX: box.getTR().x,
-            maxY: box.getTR().y,
-            object: obj
-        };
-        this.m_objectRTree.insert(item);
-        obj[RTREE_ITEM_ID] = item;
+        layerInfo.addDrawingObject(obj);
     }
 
     removeDrawingObject(obj) {
-        const idx = this.m_objectList.indexOf(obj);
-        if (idx != -1) {
-            this.m_objectList.splice(idx, 1);
-            const item = obj[RTREE_ITEM_ID];
-            if (item != null) {
-                this.m_objectRTree.remove(item);
-            }
+        const layerInfo = this.m_layerList.find(
+            layerInfo => layerInfo.layerName == obj.layer);
+        if (layerInfo) {
+            layerInfo.removeDrawingObject(obj);
         }
     }
 
     moveDrawingObject(obj) {
-        const idx = this.m_objectList.indexOf(obj);
-        if (idx != -1) {
-            const item = obj[RTREE_ITEM_ID];
-            if (item == null) {
-                this.m_objectRTree.remove(item);
-                const box = obj.getBox();
-                const item = {
-                    minX: box.getBL().x,
-                    minY: box.getBL().y,
-                    maxX: box.getTR().x,
-                    maxY: box.getTR().y,
-                    object: obj
-                };
-                this.m_objectRTree.insert(item);
-                obj[RTREE_ITEM_ID] = item;
-            }
+        const layerInfo = this.m_layerList.find(
+            layerInfo => layerInfo.layerName == obj.layer);
+        if (layerInfo) {
+            // TODO
         }
     }
 
-    DrawCircle(center, radius, color) {
-        let circle = DrawItem.CreateCircle(center, radius);
-        circle.setColor(color);
-        this.addDrawingObject(circle);
-    }
-
-    DrawLine(start, end, width, color) {
-        let line = DrawItem.CreateLine(start, end, width);
-        line.setColor(color);
-        this.addDrawingObject(line);
-    }
-
-    DrawCLine(start, end, width, color) {
-        let cline = DrawItem.CreateCLine(start, end, width);
-        cline.setColor(color);
-        this.addDrawingObject(cline);
-    }
-
-    DrawPolygon(points, color) {
-        let polygon = DrawItem.CreatePolygon(points);
-        polygon.setColor(color);
-        this.addDrawingObject(polygon);
-    }
-
+    /** @private */
     cmdZoom() {
-        this.fitScreen();
+        this.FitScreen();
     }
 
+    /** @private */
     cmdClear() {
-        this.m_objectList = [];
-        this.m_objectRTree.clear();
+        for (const layerInfo of this.m_layerList) {
+            layerInfo.clear();
+        }
     }
 
+    /** @private */
     cmdSet(args) {
         const argv = splitString(args);
         if (argv.length == 0) {
@@ -234,6 +341,7 @@ class Viewport {
         }
     }
 
+    /** @private */
     cmdDraw(args) {
         let addn = 0;
         const kregex =
@@ -271,23 +379,6 @@ class Viewport {
         }
     }
 
-    executeCommand(cmd) {
-        const c = cmd.split(' ')[0];
-        if (c === 'draw') {
-            this.cmdDraw(cmd.substr(5));
-        } else if (c === 'clear') {
-            this.cmdClear();
-            this.refreshDrawingCanvas();
-            this.clearSelection();
-        } else if (c === 'zoom') {
-            this.cmdZoom();
-        } else if (c === 'set') {
-            this.cmdSet(cmd.substr(4));
-        } else {
-            this.showError(`cann't not execute '${cmd}'`);
-        }
-    }
-
     /**
      * @param ctx { CanvasRenderingContext2D }
      * @param from { {x: float, y: float } }
@@ -296,6 +387,7 @@ class Viewport {
      * @param text { string }
      * @param ratio { float }
      * @param ignoreLength { boolean }
+     * @private
      */
     static drawTextAtLine(ctx, from, to, height, text, ratio, ignoreLength) {
         ctx.save();
@@ -330,6 +422,7 @@ class Viewport {
     /**
      * @param ctx { CanvasRenderingContext2D }
      * @param item { DrawItem }
+     * @private
      */
     static drawItemInCanvas(ctx, item) {
         if (item.type == 'line') {
@@ -440,26 +533,31 @@ class Viewport {
         }
     }
 
+    /** @private */
     checkCanvasTransform() {
         if (this.isCanvasTransformValid()) {
             this.updateCanvasCSSMatrix();
             this.m_cssRfreshCount++;
         } else {
             this.applyCanvasTransformToTransform();
-            this.refreshDrawingCanvas();
+            this.forceRefreshDrawingCanvas();
+            if (this.m_selectedObjects.length > 0) {
+                this.refreshSelection();
+            }
             this.m_drawingRefreshCount++;
         }
     }
 
+    /** @private */
     applyCanvasTransformToTransform() {
         this.m_transform = this.m_canvasTransform.concat(this.m_transform);
         this.m_canvasTransform = AffineTransformation.identity();
     }
 
+    /** @private */
     updateCanvasCSSMatrix() {
         const baseTrans = new AffineTransformation(
             1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
-        this.m_canvasListElement.style.transformOrigin = 'top left';
         const ctransform =
             baseTrans.concat(this.m_canvasTransform.concat(baseTrans.revert()));
         this.m_canvasListElement.style.transform =
@@ -467,28 +565,59 @@ class Viewport {
                 .convertToCSSMatrix();
     }
 
-    refreshDrawingCanvas() {
+    /** @private */
+    getCanvasDOMMatrixTransform() {
         const baseTrans = new AffineTransformation(
             1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
-        this.updateCanvasCSSMatrix();
+        return baseTrans.concat(this.m_transform)
+            .concat(this.stransform)
+            .convertToDOMMatrix();
+    }
 
-        let ctx = this.m_canvas.getContext('2d');
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, this.m_canvas.width, this.m_canvas.height);
-        ctx.setTransform(baseTrans.concat(this.m_transform)
-            .concat(AffineTransformation.scale(
-                this.m_baseScaleRatio, this.m_baseScaleRatio))
-            .convertToDOMMatrix());
-        for (let item of this.m_objectList) {
-            if (this.m_objectFilter.match(item)) {
-                Viewport.drawItemInCanvas(ctx, item);
+    /** @private */
+    forceRefreshDrawingCanvas() {
+        for (const layerInfo of this.m_layerList) {
+            layerInfo.markDirty();
+        }
+        this.refreshDrawingCanvas();
+    }
+
+    /** @private */
+    refreshDrawingCanvas() {
+        this.updateCanvasCSSMatrix();
+        for (const layerInfo of this.m_layerList) {
+            if (this.m_objectFilter.isLayerEnabled(layerInfo.layerName)) {
+                layerInfo.canvasElement.style.display = 'block';
+            } else {
+                layerInfo.canvasElement.style.display = 'none';
+                continue;
+            }
+
+            if (!layerInfo.isDirty) {
+                continue;
+            }
+            layerInfo.markClean();
+
+            let ctx = layerInfo.canvasElement.getContext('2d');
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(
+                0, 0, this.m_defaultDrawingCanvas.width,
+                this.m_defaultDrawingCanvas.height);
+            ctx.setTransform(this.getCanvasDOMMatrixTransform());
+
+            for (let item of layerInfo.objectList) {
+                if (this.m_objectFilter.match(item)) {
+                    Viewport.drawItemInCanvas(ctx, item);
+                }
             }
         }
 
         this.refreshCoordination();
     }
 
+    /** @private */
     refreshCoordination() {
+        // TODO
         let ctx = this.m_coordinationBox.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(
@@ -542,11 +671,14 @@ class Viewport {
         }
     }
 
-    drawSelection(start, to) {
+    /** @public */
+    SelectBoxInViewport(startInViewport, toInViewport) {
+        const start = this.viewportCoordToCanvas(startInViewport);
+        const to = this.viewportCoordToCanvas(toInViewport);
+
         let ctx = this.m_selectionBox.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(
-            0, 0, this.m_selectionBox.width, this.m_selectionBox.height);
+        ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
         ctx.fillStyle = 'rgba(93, 93, 255, 0.3)';
         const width = Math.abs(to.x - start.x);
         const height = Math.abs(to.y - start.y);
@@ -563,57 +695,37 @@ class Viewport {
         path.lineTo(to.x, start.y);
         path.closePath();
         ctx.stroke(path);
-        this.m_selectionStart = start;
-        this.m_selectionTo = to;
-        this.m_selectedItems = [];
+
+        this.m_selectionStart = this.viewportCoordToReal(startInViewport);
+        this.m_selectionTo = this.viewportCoordToReal(toInViewport);
+        this.m_selectedObjects = [];
         this.drawSelectedItem(this.m_selectionStart, this.m_selectionTo);
     }
 
-    drawSelectedItem(start, to) {
-        if (start == null || to == null) {
-            this.m_selectedItems = [];
+    /** @private */
+    drawSelectedItem(startReal, toReal) {
+        if (startReal == null || toReal == null) {
+            this.m_selectedObjects = [];
             this.m_selectedItemsCountSubject.next(0);
             this.m_selectedItemsTextSubject.next('');
         } else {
-            const baseTrans = new AffineTransformation(
-                1, 0, 0, -1, this.m_coordinationBox.width / 2,
-                this.m_coordinationBox.height / 2);
-            const t = baseTrans.concat(this.m_transform);
-            const box = new BoundingBox(t.revertXY(start), t.revertXY(to));
-            const bn = box.inflate(1);
-            const polygon = new Polygon([
-                new Point(bn.minX, bn.minY), new Point(bn.maxX, bn.minY),
-                new Point(bn.maxX, bn.maxY), new Point(bn.minX, bn.maxY)
-            ]);
-            const rtreeCollide = this.m_objectRTree.search({
-                minX: box.getBL().x,
-                minY: box.getBL().y,
-                maxX: box.getTR().x,
-                maxY: box.getTR().y
-            });
-            this.m_selectedItems = [];
-            const objects = [];
-            for (let item of rtreeCollide) {
-                if (!this.m_objectFilter.match(item.object)) {
+            const box = new BoundingBox(startReal, toReal);
+            const selectedObjects = []
+            for (const layerInfo of this.m_layerList) {
+                if (!this.m_objectFilter.isLayerEnabled(layerInfo.layerName)) {
                     continue;
                 }
-                const distance = polygon.distanceTo(item.object.shape());
-                const mindis = (item.object.width || 0) / 2;
-                if (distance[0] <= mindis ||
-                    polygon.contains(item.object.shape()) ||
-                    (item.object.type == 'polygon' &&
-                        item.object.shape().contains(polygon))) {
-                    this.m_selectedItems.push(item);
-                    objects.push(item.object);
-                }
+                const objs = layerInfo.collideWithBox(box, item => this.m_objectFilter.match(item));
+                selectedObjects.push(...objs);
             }
-            if (objects.length == 0) {
+            this.m_selectedObjects = selectedObjects;
+            if (this.m_selectedObjects.length == 0) {
                 this.m_selectedItemsCountSubject.next(0);
                 this.m_selectedItemsTextSubject.next('');
             } else {
-                this.m_selectedItemsCountSubject.next(objects.length);
+                this.m_selectedItemsCountSubject.next(this.m_selectedObjects.length);
                 this.m_selectedItemsTextSubject.next(
-                    JSON.stringify(objects, (key, value) => {
+                    JSON.stringify(this.m_selectedObjects, (key, value) => {
                         if (key == 'm_shape')
                             return undefined;
                         else
@@ -624,32 +736,30 @@ class Viewport {
         this.refreshSelection();
     }
 
+    /** public */
     RemoveSelectedItems() {
-        for (let obj of this.m_selectedItems) {
-            this.removeDrawingObject(obj['object']);
+        for (const obj of this.m_selectedObjects) {
+            this.removeDrawingObject(obj);
         }
-        this.m_selectedItems = [];
-        this.refreshSelection();
+        this.m_selectedObjects = [];
         this.refreshDrawingCanvas();
+        this.refreshSelection();
     }
 
+    /** @private */
     refreshSelection() {
         let ctx = this.m_selectedItemsCanvas.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(
-            0, 0, this.m_selectedItemsCanvas.width,
-            this.m_selectedItemsCanvas.height);
-        const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.m_coordinationBox.width / 2,
-            this.m_coordinationBox.height / 2);
-        const t = baseTrans.concat(this.m_transform);
-        ctx.setTransform(t.a, t.c, t.b, t.d, t.tx, t.ty);
-        for (let item of this.m_selectedItems) {
-            const obj = item['object'];
+        ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+        this.updateCanvasCSSMatrix();
+        ctx.setTransform(this.getCanvasDOMMatrixTransform());
+
+        for (const obj of this.m_selectedObjects) {
             const oldColor = obj.color;
             try {
                 obj.color = 'rgba(200, 200, 230, 0.3)';
-                Viewport.drawItemInCanvas(ctx, item['object']);
+                Viewport.drawItemInCanvas(ctx, obj);
             } finally {
                 obj.color = oldColor;
             }
@@ -659,29 +769,33 @@ class Viewport {
     clearSelection() {
         let ctx = this.m_selectionBox.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(
-            0, 0, this.m_selectionBox.width, this.m_selectionBox.height);
+        ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
         this.drawSelectedItem(this.m_selectionStart, this.m_selectionTo);
     }
 
+    /** @private */
     get viewportWidth() {
         return this.m_viewportEl.clientWidth;
     }
 
+    /** @private */
     get viewportHeight() {
         return this.m_viewportEl.clientHeight;
     }
 
+    /** @private */
     get canvasWidth() {
         const scaleVal = this.m_baseScaleRatio * this.m_baseScaleRatio;
         return this.viewportWidth * scaleVal;
     }
 
+    /** @private */
     get canvasHeight() {
         const scaleVal = this.m_baseScaleRatio * this.m_baseScaleRatio;
         return this.viewportHeight * scaleVal;
     }
 
+    /** @private */
     get BaseCanvas2ViewportTransform() {
         const s = 1 / this.m_baseScaleRatio;
         const deltax = (1 - this.m_baseScaleRatio) * this.viewportWidth / 2;
@@ -689,40 +803,31 @@ class Viewport {
         return new AffineTransformation(s, 0, 0, s, deltax, deltay);
     }
 
-    fitCanvas() {
+    /** @private */
+    onViewportResize() {
         const w = this.canvasWidth;
         const h = this.canvasHeight;
         this.m_canvasListElement.style.width = `${w}px`;
         this.m_canvasListElement.style.height = `${h}px`;
-        for (let canvas of this.m_canvasList) {
+        for (let canvas of this.canvasList) {
             canvas.width = w;
             canvas.height = h;
         }
-        this.refreshDrawingCanvas();
+        this.forceRefreshDrawingCanvas();
     }
 
-    get paused() {
-        return this.m_paused;
-    }
-    get totalFrames() {
-        return this.m_totalFrames;
-    }
-    get currentFrame() {
-        return this.m_currentFrame;
-    }
-
+    /** @private */
     viewportCoordToReal(point) {
         const baseTrans = new AffineTransformation(
             1, 0, 0, -1, this.viewportWidth / 2, this.viewportHeight / 2);
-        const scaleTransform = AffineTransformation.scale(
-            this.m_baseScaleRatio, this.m_baseScaleRatio);
-        const transform = baseTrans.concat(scaleTransform.revert())
+        const transform = baseTrans.concat(this.stransform.revert())
             .concat(this.qtransform)
-            .concat(scaleTransform);
+            .concat(this.stransform);
         const ans = transform.revertXY(point);
         return { x: Math.round(ans.x), y: Math.round(ans.y) };
     }
 
+    /** @private */
     viewportCoordToCanvas(point) {
         const baseTrans = new AffineTransformation(
             1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
@@ -733,6 +838,7 @@ class Viewport {
         return ctransform.revertXY(point);
     }
 
+    /** @private */
     isCanvasTransformValid() {
         const a = this.viewportCoordToCanvas({ x: 0, y: 0 });
         const b = this.viewportCoordToCanvas({ x: this.viewportWidth, y: 0 });
@@ -754,118 +860,98 @@ class Viewport {
             !innerbox.containsPoint(c) && !innerbox.containsPoint(d);
     }
 
-    reset() {
-        this.m_transform = AffineTransformation.identity();
-        this.refreshDrawingCanvas();
-    }
-    fitScreen() {
-        return;
-        let box = null;
-        for (let obj of this.m_objectList) {
-            if (this.m_objectFilter.match(obj)) {
-                const kbox = obj.getBox();
-                if (box == null) {
-                    box = kbox;
-                } else {
-                    if (kbox) {
-                        box = box.mergeBox(kbox);
-                    }
-                }
-            }
-        }
-
-        if (box == null) {
-            return;
-        }
-        box = box.inflate(10);
-
-        const boxviewport = new BoundingBox(
-            { x: -this.m_canvas.width / 2, y: -this.m_canvas.height / 2 },
-            { x: this.m_canvas.width / 2, y: this.m_canvas.height / 2 });
-        this.m_transform = Box2boxTransformation(box, boxviewport);
-        this.refreshDrawingCanvas();
-    }
-    scaleUp(X, Y) {
-        this.scale(1.1, 1.1, X, Y);
-        this.refreshDrawingCanvas();
-        this.refreshSelection();
-    }
-    scaleDown(X, Y) {
-        this.scale(1 / 1.1, 1 / 1.1, X, Y);
-        this.refreshDrawingCanvas();
-        this.refreshSelection();
-    }
-    moveLeft() {
-        this.translate(-50, 0);
-        this.refreshDrawingCanvas();
-        this.refreshSelection();
-    }
-    moveRight() {
-        this.translate(50, 0);
-        this.refreshDrawingCanvas();
-        this.refreshSelection();
-    }
-    moveUp() {
-        this.translate(0, 50);
-        this.refreshDrawingCanvas();
-        this.refreshSelection();
-    }
-    moveDown() {
-        this.translate(0, -50);
-        this.refreshDrawingCanvas();
-        this.refreshSelection();
+    /** @private */
+    get stransform() {
+        return AffineTransformation.scale(
+            this.m_baseScaleRatio, this.m_baseScaleRatio);
     }
 
+    /** @private */
     get qtransform() {
         return this.m_canvasTransform.concat(this.m_transform);
     }
 
+    /** @private */
     get qscaleTransform() {
-        const S = AffineTransformation.scale(
-            this.m_baseScaleRatio, this.m_baseScaleRatio);
-        return this.qtransform.concat(S);
+        return this.qtransform.concat(this.stransform);
     }
 
+    /**
+     * @param scaleX { float }
+     * @param scaleY { float }
+     * @param _X { float }
+     * @param _Y { float }
+     * @private
+     */
     scale(scaleX, scaleY, _X, _Y) {
         const X = _X || 0
         const Y = _Y || 0
 
-        const xy = this.qscaleTransform.applyXY({ x: X, y: Y });
-        const translation1 = new AffineTransformation(1, 0, 0, 1, -xy.x, -xy.y);
+        const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
         const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
-        const translation2 = new AffineTransformation(1, 0, 0, 1, xy.x, xy.y);
+        const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
+        this.applyTransformToReal(translation2.concat(scaling.concat(translation1)));
+    }
 
-        const scaleAt = translation2.concat(scaling.concat(translation1));
-        this.m_canvasTransform = scaleAt.concat(this.m_canvasTransform);
+    /**
+     * @param X { float }
+     * @param Y { float }
+     * @private
+     */
+    translate(X, Y) {
+        this.applyTransformToReal(AffineTransformation.translate(X, Y))
+    }
+
+    /**
+     * @param X { float }
+     * @param Y { float }
+     * @private
+     */
+    translateInViewport(X, Y) {
+        const p1 = this.viewportCoordToReal({ x: 0, y: 0 });
+        const p2 = this.viewportCoordToReal({ x: X, y: Y });
+        this.translate(p2.x - p1.x, p2.y - p1.y);
+    }
+
+    /**
+     * @param clockDegree { float }
+     * @param X { float }
+     * @param Y { float }
+     * @private
+     */
+    rotateAt(clockDegree, X, Y) {
+        const c = Math.cos(clockDegree / 180 * Math.PI);
+        const s = Math.sin(clockDegree / 180 * Math.PI);
+        const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
+        const rotation = new AffineTransformation(c, s, -s, c, 0, 0);
+        const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
+        this.applyTransformToReal(translation2.concat(rotation.concat(translation1)));
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @private
+     */
+    applyTransformToReal(transform) {
+        const t = this.qscaleTransform
+            .concat(transform)
+            .concat(this.qscaleTransform.revert());
+        this.m_canvasTransform = t.concat(this.m_canvasTransform);
         this.checkCanvasTransform();
     }
 
-    translate(X, Y) {
-        const v1 = this.m_transform.revertXY({ x: X, y: Y });
-        const v2 = this.m_transform.revertXY({ x: 0, y: 0 });
-        this.m_canvasTransform =
-            new AffineTransformation(1, 0, 0, 1, v1.x - v2.x, v1.y - v2.y)
-                .concat(this.m_canvasTransform);
-        // this.m_transform = this.m_transform.concat(
-        //     new AffineTransformation(1, 0, 0, 1, v1.x - v2.x, v1.y - v2.y));
-    }
-
-    rotate(clockDegree) {
-        const c = Math.cos(clockDegree / 180 * Math.PI);
-        const s = Math.sin(clockDegree / 180 * Math.PI);
-        this.m_transform = this.m_transform.concat(
-            new AffineTransformation(c, s, -s, c, 0, 0));
-    }
-
-    play() {
+    /** @public */
+    Play() {
         this.m_paused = false;
     }
 
-    pause() {
+    /** @public */
+    Pause() {
         this.m_paused = true;
     }
 
-    async setFrame(n) {
+    /** @public */
+    async GotoFrame(n) {
         if (n > this.m_totalFrames - 1) return;
 
         this.drawSelectedItem(null, null);
@@ -878,32 +964,188 @@ class Viewport {
             Object.assign(drawItem, obj);
             this.addDrawingObject(drawItem);
         }
-        this.refreshDrawingCanvas();
+        // FIXME
+        this.forceRefreshDrawingCanvas();
         this.m_frameCountSubject.next(n + 1);
     }
 
-    init(box, totalFrames, loader) {
+    /** @public */
+    SetDataSource(box, totalFrames, loader) {
         this.m_currentFrame = 0;
         this.m_totalFrames = totalFrames;
-        if (box && false) {
+        if (box) {
             const boxviewport = new BoundingBox(
-                { x: -this.m_canvas.width / 2, y: -this.m_canvas.height / 2 },
-                { x: this.m_canvas.width / 2, y: this.m_canvas.height / 2 });
-            this.m_transform = Box2boxTransformation(box, boxviewport);
+                { x: -this.viewportWidth / 2, y: -this.viewportHeight / 2 },
+                { x: this.viewportWidth / 2, y: this.viewportHeight / 2 });
+            this.m_transform = this.stransform
+                .concat(Box2boxTransformation(box, boxviewport))
+                .concat(this.stransform.revert());
         } else {
             this.m_transform = AffineTransformation.identity();
         }
         this.m_loader = loader;
-        this.setFrame(0);
+        this.GotoFrame(0);
     }
 
-    m_paused = true;
-    m_currentFrame = 0;
-    m_totalFrames = 30;
-    m_loader;
-    m_transform;
-    m_viewportEl;
-    m_objectList;
+    /** @public */
+    get Paused() {
+        return this.m_paused;
+    }
+    /** @public */
+    get TotalFrames() {
+        return this.m_totalFrames;
+    }
+    /** @public */
+    get CurrentFrame() {
+        return this.m_currentFrame;
+    }
+
+    /** @public */
+    Reset() {
+        this.m_transform = AffineTransformation.identity();
+        this.m_canvasTransform = AffineTransformation.identity();
+        this.forceRefreshDrawingCanvas();
+    }
+
+    /** @public */
+    FitScreen() {
+        let box = null;
+        for (const layerInfo of this.m_layerList) {
+            if (!this.m_objectFilter.isLayerEnabled(layerInfo.layerName)) {
+                continue;
+            }
+
+            for (const obj of layerInfo.objectList) {
+                if (this.m_objectFilter.match(obj)) {
+                    const kbox = obj.getBox();
+                    if (box == null) {
+                        box = kbox;
+                    } else {
+                        if (kbox) {
+                            box = box.mergeBox(kbox);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (box == null) {
+            return;
+        }
+        box = box.inflate(10);
+
+        const boxviewport = new BoundingBox(
+            { x: -this.viewportWidth / 2, y: -this.viewportHeight / 2 },
+            { x: this.viewportWidth / 2, y: this.viewportHeight / 2 });
+        this.applyCanvasTransformToTransform();
+        this.m_transform =
+            this.stransform.concat(Box2boxTransformation(box, boxviewport))
+                .concat(this.stransform.revert());
+        this.forceRefreshDrawingCanvas();
+    }
+    /** @public */
+    ScaleUp(X, Y) {
+        X = X || 0;
+        Y = Y || 0;
+        const pt = this.viewportCoordToReal({ x: X, y: Y });
+        this.scale(1.1, 1.1, pt.x, pt.y);
+    }
+    /** @public */
+    ScaleDown(X, Y) {
+        X = X || 0;
+        Y = Y || 0;
+        const pt = this.viewportCoordToReal({ x: X, y: Y });
+        this.scale(1 / 1.1, 1 / 1.1, pt.x, pt.y);
+    }
+    /** @public */
+    MoveLeft() {
+        this.translateInViewport(-50, 0);
+    }
+    /** @public */
+    MoveRight() {
+        this.translateInViewport(50, 0);
+    }
+    /** @public */
+    MoveUp() {
+        this.translateInViewport(0, -50);
+    }
+    /** @public */
+    MoveDown() {
+        this.translateInViewport(0, 50);
+    }
+    /** @public */
+    RotateAround(clockwiseDegree, X, Y) {
+        X = X || 0;
+        Y = Y || 0;
+        const pt = this.viewportCoordToReal({ x: X, y: Y });
+        this.rotateAt(clockwiseDegree, pt.x, pt.y);
+    }
+
+    /** @public */
+    DrawCircle(center, radius, color) {
+        let circle = DrawItem.CreateCircle(center, radius);
+        circle.setColor(color);
+        this.addDrawingObject(circle);
+    }
+
+    /** @public */
+    DrawLine(start, end, width, color) {
+        let line = DrawItem.CreateLine(start, end, width);
+        line.setColor(color);
+        this.addDrawingObject(line);
+    }
+
+    /** @public */
+    DrawCLine(start, end, width, color) {
+        let cline = DrawItem.CreateCLine(start, end, width);
+        cline.setColor(color);
+        this.addDrawingObject(cline);
+    }
+
+    /** @public */
+    DrawPolygon(points, color) {
+        let polygon = DrawItem.CreatePolygon(points);
+        polygon.setColor(color);
+        this.addDrawingObject(polygon);
+    }
+
+    /** @public */
+    ExecuteCommand(cmd) {
+        const c = cmd.split(' ')[0];
+        if (c === 'draw') {
+            this.cmdDraw(cmd.substr(5));
+        } else if (c === 'clear') {
+            this.cmdClear();
+            this.forceRefreshDrawingCanvas();
+            this.clearSelection();
+        } else if (c === 'zoom') {
+            this.cmdZoom();
+        } else if (c === 'set') {
+            this.cmdSet(cmd.substr(4));
+        } else {
+            this.showError(`cann't not execute '${cmd}'`);
+        }
+    }
+
+    /** @public */
+    get frameCountObservable() {
+        return this.m_frameCountObservable;
+    }
+
+    /** @public */
+    get selectedItemsCountObservable() {
+        return this.m_selectedItemsCountObservable;
+    }
+
+    /** @public */
+    get selectedItemsTextObservable() {
+        return this.m_selectedItemsTextObservable;
+    }
+
+    /** @public */
+    get errorObservable() {
+        return this.m_errorObservable;
+    }
 }
 
 export { Viewport };

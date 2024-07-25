@@ -1,3 +1,5 @@
+import { Observable, Subject } from './thirdparty/rxjs.js';
+
 class FilterRule {
     constructor() {
         this.enabled = true;
@@ -74,6 +76,10 @@ class LayerFilter extends FilterRule {
         return list;
     }
 
+    isLayerEnabled(layer) {
+        return this.m_layerStatus.get(layer);
+    }
+
     match(obj) {
         if (!this.enabled) {
             return true;
@@ -81,7 +87,7 @@ class LayerFilter extends FilterRule {
         if (obj.layer == null) {
             return this.m_layerStatus.get('default');
         }
-        return this.m_layerStatus.get(obj.layer);
+        return this.isLayerEnabled(obj.layer);
     }
 
     addLayer(layer) {
@@ -121,7 +127,7 @@ function createFilterRule(str) {
 }
 
 class ObjectFilter {
-    constructor(filterHtmlId, refreshCallback) {
+    constructor(filterHtmlId) {
         this.m_filters = [];
         this.m_rootEl = document.getElementById(filterHtmlId);
         this.m_ruleListEl = this.m_rootEl.querySelector('.object-filter-list');
@@ -132,7 +138,7 @@ class ObjectFilter {
             this.m_rootEl.querySelector('.object-filter-toggle');
         this.m_layerFilterEl = this.m_rootEl.querySelector('.layer-filter');
         this.m_enableCheckbox.checked = true;
-        this.m_refreshCallback = refreshCallback;
+        this.m_layerChangeSubject = new Subject();
         this.m_layerFilter = new LayerFilter();
 
         this.m_addBtn.addEventListener('click', () => {
@@ -150,7 +156,7 @@ class ObjectFilter {
             this.saveToLocalStorage();
         });
         this.m_enableCheckbox.addEventListener('click', () => {
-            this.m_refreshCallback();
+            this.m_layerChangeSubject.next();
         });
         this.m_inputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -162,6 +168,12 @@ class ObjectFilter {
         });
 
         this.loadFromLocalStorage();
+    }
+
+    get layerChangeObservable() {
+        return new Observable(subscriber => {
+            this.m_layerChangeSubject.subscribe(subscriber);
+        });
     }
 
     get enabled() {
@@ -191,7 +203,7 @@ class ObjectFilter {
             checkbox.checked = filter.enabled;
             checkbox.addEventListener('click', () => {
                 this.setFilterEnabled(filter, checkbox.checked);
-                this.m_refreshCallback();
+                this.m_layerChangeSubject.next();
             });
             const textEl = document.createElement('span');
             textEl.innerText = filter.toString(true);
@@ -218,7 +230,7 @@ class ObjectFilter {
             checkbox.checked = enabled;
             checkbox.addEventListener('click', () => {
                 this.m_layerFilter.toggleLayer(layer);
-                this.m_refreshCallback();
+                this.m_layerChangeSubject.next();
             });
             const textEl = document.createElement('span');
             textEl.innerText = layer;
@@ -227,7 +239,7 @@ class ObjectFilter {
             this.m_layerFilterEl.appendChild(li);
         });
 
-        this.m_refreshCallback();
+        this.m_layerChangeSubject.next();
     }
 
     touchLayer(layer) {
@@ -238,7 +250,7 @@ class ObjectFilter {
 
     setFilterEnabled(filter, enabled) {
         filter.enabled = enabled;
-        this.m_refreshCallback
+        this.m_layerChangeSubject.next();
     }
 
     removeFilter(filter) {
@@ -285,6 +297,10 @@ class ObjectFilter {
         if (str != null) {
             this.loadFilter(JSON.parse(str));
         }
+    }
+
+    isLayerEnabled(layer) {
+        return this.m_layerFilter.isLayerEnabled(layer);
     }
 
     match(obj) {
