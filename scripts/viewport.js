@@ -41,6 +41,35 @@ class ViewportDrawingLayer {
         this.m_objectRTree = new RBush();
         this.m_canvasElement = canvasElement;
         this.m_dirty = true;
+        this.m_drawedItems = [];
+    }
+
+    setDrawedItems(items) {
+        this.m_drawedItems = items;
+    }
+
+    clearDrawedItems() {
+        this.m_drawedItems = [];
+    }
+
+    get drawedItems() {
+        return this.m_drawedItems;
+    }
+
+    /**
+     * @param {DrawItem[]} items
+     * @return {boolean}
+     */
+    isEqualToDrawedItems(items) {
+        if (items.length != this.m_drawedItems.length) {
+            return false;
+        }
+        for (let i = 0; i < items.length; i++) {
+            if (items[i] != this.m_drawedItems[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     get layerName() {
@@ -180,6 +209,22 @@ class Viewport {
         this.m_objectFilter = objectFilter;
         this.m_objectFilter.layerChangeObservable.subscribe(() => {
             if (this.m_layerList) {
+                for (const layerInfo of this.m_layerList) {
+                    if (layerInfo.isDirty ||
+                        !this.m_objectFilter.isLayerEnabled(
+                            layerInfo.layerName)) {
+                        continue;
+                    }
+                    const matchedItems = [];
+                    for (const item of layerInfo.objectList) {
+                        if (this.m_objectFilter.match(item)) {
+                            matchedItems.push(item);
+                        }
+                    }
+                    if (!layerInfo.isEqualToDrawedItems(matchedItems)) {
+                        layerInfo.markDirty();
+                    }
+                }
                 this.refreshDrawingCanvas();
                 this.refreshSelection();
             }
@@ -603,11 +648,14 @@ class Viewport {
             ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
             ctx.setTransform(this.getCanvasDOMMatrixTransform());
 
+            const drawedItems = [];
             for (let item of layerInfo.objectList) {
                 if (this.m_objectFilter.match(item)) {
                     Viewport.drawItemInCanvas(ctx, item);
+                    drawedItems.push(item);
                 }
             }
+            layerInfo.setDrawedItems(drawedItems);
         }
 
         this.refreshCoordination();
