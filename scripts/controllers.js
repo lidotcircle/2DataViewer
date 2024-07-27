@@ -16,6 +16,8 @@ const fitScreen = document.getElementById('fit-screen');
 const reset = document.getElementById('reset');
 const scaleUp = document.getElementById('scale-up');
 const scaleDown = document.getElementById('scale-down');
+const mirrorXAxis = document.getElementById('mirror-xaxis');
+const mirrorYAxis = document.getElementById('mirror-yaxis');
 const rotateLeftAtOrigin = document.getElementById('rotate-ccw-at-origin');
 const rotateRightAtOrigin = document.getElementById('rotate-cw-at-origin');
 const moveLeft = document.getElementById('move-left');
@@ -44,6 +46,8 @@ export {
     reset,
     scaleUp,
     scaleDown,
+    mirrorXAxis,
+    mirrorYAxis,
     rotateLeftAtOrigin,
     rotateRightAtOrigin,
     moveLeft,

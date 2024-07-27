@@ -65,6 +65,8 @@ class LayerFilter extends FilterRule {
         super();
         this.m_layerStatus = new Map();
         this.m_layerStatus.set('default', true);
+        this.m_layerOrder = [];
+        this.m_layerOrder.push('default');
     }
 
     layerList() {
@@ -72,12 +74,51 @@ class LayerFilter extends FilterRule {
         for (let key of this.m_layerStatus.keys()) {
             list.push([key, this.m_layerStatus.get(key)]);
         }
-        list.sort((a, b) => a[0].localeCompare(b[0]));
+        const om = new Map();
+        for (let key of this.m_layerStatus.keys()) {
+            om.set(key, this.m_layerOrder.indexOf(key));
+        }
+        list.sort((a, b) => {
+            const ia = om.get(a[0]);
+            const ib = om.get(b[0]);
+            if (ia == null && ib == null) {
+                return a[0].localeCompare(b[0]);
+            }
+            if (ia == null) {
+                return 1;
+            }
+            if (ib == null) {
+                return -1;
+            }
+            return ia - ib;
+        });
         return list;
     }
 
     isLayerEnabled(layer) {
         return this.m_layerStatus.get(layer);
+    }
+
+    /**
+     * @brief sort layers
+     * @param {string[]} order
+     * @return {boolean}
+     */
+    setLayerOrder(order) {
+        const isSame = (() => {
+            console.assert(order.length == this.m_layerOrder.length);
+            if (order.length == this.m_layerOrder.length) {
+                for (const i = 0; i < order.length; i++) {
+                    if (order[i] != this.m_layerOrder[i]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
+        })();
+        this.m_layerOrder = [...order];
+        return !isSame;
     }
 
     match(obj) {
@@ -95,11 +136,16 @@ class LayerFilter extends FilterRule {
             return false;
         }
         this.m_layerStatus.set(layer, true);
+        this.m_layerOrder.push(layer);
         return true;
     }
 
     removeLayer(layer) {
         this.m_layerStatus.delete(layer);
+        const idx = this.m_layerOrder.indexOf(layer);
+        if (idx != -1) {
+            this.m_layerOrder.splice(idx, 1);
+        }
     }
 
     toggleLayer(layer) {
@@ -297,6 +343,16 @@ class ObjectFilter {
         if (str != null) {
             this.loadFilter(JSON.parse(str));
         }
+    }
+
+    /**
+     * @param {string[]} order
+     */
+    setLayerOrder(order) {
+        if (this.m_layerFilter.setLayerOrder(order)) {
+            this.refreshFilterList();
+        }
+
     }
 
     isLayerEnabled(layer) {

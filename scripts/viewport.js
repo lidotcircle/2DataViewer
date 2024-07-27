@@ -583,6 +583,7 @@ class Viewport {
         if (this.isCanvasTransformValid()) {
             this.updateCanvasCSSMatrix();
             this.m_cssRfreshCount++;
+            this.refreshCoordination();
         } else {
             this.applyCanvasTransformToTransform();
             this.forceRefreshDrawingCanvas();
@@ -669,6 +670,12 @@ class Viewport {
         const pb = this.viewportCoordToReal({ x: w1, y: -h1 });
         const pc = this.viewportCoordToReal({ x: w1, y: h1 });
         const pd = this.viewportCoordToReal({ x: -w1, y: h1 });
+        const viewportBox = new BoundingBox(
+            { x: 0, y: 0 }, { x: this.viewportWidth, y: this.viewportHeight });
+        const viewportBoxA = this.viewportCoordToReal(viewportBox.getBL());
+        const viewportBoxB = this.viewportCoordToReal(viewportBox.getBR());
+        const viewportBoxC = this.viewportCoordToReal(viewportBox.getTR());
+        const viewportBoxD = this.viewportCoordToReal(viewportBox.getTL());
         const abignum = 2 ** 30;
         const horizLinePa = { x: -abignum, y: 0 };
         const horizLinePb = { x: abignum, y: 0 };
@@ -690,21 +697,68 @@ class Viewport {
             }
             return null;
         };
-        const hlineOpt = lineToBoxIntersectionPoint(horizLinePa, horizLinePb);
-        const vlineOpt = lineToBoxIntersectionPoint(vertLinePa, vertLinePb);
-        const segs = [];
-        if (hlineOpt) segs.push(hlineOpt);
-        if (vlineOpt) segs.push(vlineOpt);
+        const lineToViewportIntersectionPoint = (a, b) => {
+            const ans = [];
+            const ptOpt1 = findLineSegmentIntersection(a, b, viewportBoxA, viewportBoxB);
+            const ptOpt2 = findLineSegmentIntersection(a, b, viewportBoxB, viewportBoxC);
+            const ptOpt3 = findLineSegmentIntersection(a, b, viewportBoxC, viewportBoxD);
+            const ptOpt4 = findLineSegmentIntersection(a, b, viewportBoxD, viewportBoxA);
+            if (ptOpt1) ans.push(ptOpt1);
+            if (ptOpt2) ans.push(ptOpt2);
+            if (ptOpt3) ans.push(ptOpt3);
+            if (ptOpt4) ans.push(ptOpt4);
+            if (ans.length >= 2) {
+                return ans.slice(0, 2);
+            }
+            return null;
+        };
 
+        const segs = [];
+        const polygons = [];
         let ctx = this.m_coordinationBox.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
         ctx.setTransform(this.getCanvasDOMMatrixTransform());
-        const p1 = this.viewportCoordToReal({ x: 0, y: 0 });
-        const p2 = this.viewportCoordToReal({ x: 50, y: 50 });
-        const vec = PointSub(p2, p1);
-        const vecLen = Math.sqrt(vec.x * vec.x + vec.y * vec.y);
-        const lineWidth = Math.ceil(vecLen / 50);
+
+        const hlineOpt = lineToBoxIntersectionPoint(horizLinePa, horizLinePb);
+        const vlineOpt = lineToBoxIntersectionPoint(vertLinePa, vertLinePb);
+        if (hlineOpt) segs.push(hlineOpt);
+        if (vlineOpt) segs.push(vlineOpt);
+
+        const lineWidth = (() => {
+            const p1 = this.viewportCoordToReal({ x: 0, y: 0 });
+            const p2 = this.viewportCoordToReal({ x: 100, y: 100 });
+            const vec = PointSub(p2, p1);
+            const vecLen = Math.sqrt(vec.x * vec.x + vec.y * vec.y);
+            return vecLen / 50;
+        })();
+
+        const hlineViewportOpt = lineToViewportIntersectionPoint(horizLinePa, horizLinePb);
+        const vlineViewportOpt = lineToViewportIntersectionPoint(vertLinePa, vertLinePb);
+        const arrowLength = 5 * lineWidth;
+        if (hlineOpt && hlineViewportOpt) {
+            const arrowPoint = hlineViewportOpt[0].x < hlineViewportOpt[1].x ?
+                hlineViewportOpt[1] : hlineViewportOpt[0];
+            const upPoint = PointAdd(arrowPoint, { x: -arrowLength, y: arrowLength / 3 });
+            const downPoint = PointAdd(arrowPoint, { x: -arrowLength, y: -arrowLength / 3 });
+            polygons.push([arrowPoint, upPoint, downPoint]);
+            const p1 = PointAdd(upPoint, { x: -arrowLength * 3 / 4, y: arrowLength / 4 });;
+            const p2 = PointAdd(upPoint, { x: arrowLength / 4, y: arrowLength / 4 });;
+            ctx.fillStyle = 'rgba(100, 160, 200, 0.8)';
+            Viewport.drawTextAtLine(ctx, p1, p2, arrowLength * 0.7, 'y', 0.95, true);
+        }
+        if (vlineOpt && vlineViewportOpt) {
+            const arrowPoint = vlineViewportOpt[0].y < vlineViewportOpt[1].y ?
+                vlineViewportOpt[1] : vlineViewportOpt[0];
+            const leftPoint = PointAdd(arrowPoint, { x: arrowLength / 3, y: -arrowLength });
+            const rightPoint = PointAdd(arrowPoint, { x: -arrowLength / 3, y: -arrowLength });
+            polygons.push([arrowPoint, leftPoint, rightPoint]);
+            const p1 = PointAdd(leftPoint, { x: -arrowLength * 1.4, y: -arrowLength / 4 });
+            const p2 = PointAdd(p1, { x: arrowLength, y: 0 });
+            ctx.fillStyle = 'rgba(100, 160, 200, 0.8)';
+            Viewport.drawTextAtLine(ctx, p1, p2, arrowLength * 0.7, 'x', 1.25, true);
+        }
+
         for (let seg of segs) {
             const path = new Path2D();
             path.lineTo(seg[0].x, seg[0].y);
@@ -712,6 +766,16 @@ class Viewport {
             ctx.strokeStyle = 'rgba(60, 60, 60, 0.5)';
             ctx.lineWidth = lineWidth;
             ctx.stroke(path);
+        }
+        for (let polygon of polygons) {
+            const path = new Path2D();
+            path.moveTo(polygon[0].x, polygon[0].y);
+            for (let i = 1; i < polygon.length; i++) {
+                path.lineTo(polygon[i].x, polygon[i].y);
+            }
+            path.closePath();
+            ctx.fillStyle = 'rgba(60, 60, 60, 1)';
+            ctx.fill(path);
         }
     }
 
@@ -1008,6 +1072,28 @@ class Viewport {
     }
 
     /**
+     * @param xVal { float }
+     * @private
+     */
+    flipXAxisToViewport(xVal) {
+        const translation1 = new AffineTransformation(1, 0, 0, 1, -xVal, 0);
+        const scaling = new AffineTransformation(-1, 0, 0, 1, 0, 0);
+        const translation2 = new AffineTransformation(1, 0, 0, 1, xVal, 0);
+        this.applyTransformToViewport(translation2.concat(scaling.concat(translation1)));
+    }
+
+    /**
+     * @param yVal { float }
+     * @private
+     */
+    flipYAxisToViewport(yVal) {
+        const translation1 = new AffineTransformation(1, 0, 0, 1, 0, -yVal);
+        const scaling = new AffineTransformation(1, 0, 0, -1, 0, 0);
+        const translation2 = new AffineTransformation(1, 0, 0, 1, 0, yVal);
+        this.applyTransformToViewport(translation2.concat(scaling.concat(translation1)));
+    }
+
+    /**
      * @param transform { AffineTransformation }
      * @private
      */
@@ -1180,6 +1266,18 @@ class Viewport {
         X = X || 0;
         Y = Y || 0;
         this.rotateAtToViewport(clockwiseDegree, X, Y);
+    }
+
+    /** @public */
+    MirrorX(X) {
+        X = X || this.viewportCenter.x;
+        this.flipXAxisToViewport(X);
+    }
+
+    /** @public */
+    MirrorY(Y) {
+        Y = Y || this.viewportCenter.y;
+        this.flipYAxisToViewport(Y);
     }
 
     /** @public */

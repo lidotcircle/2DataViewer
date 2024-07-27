@@ -169,6 +169,14 @@ class BoundingBox {
         return { x: this.minX, y: this.minY };
     }
 
+    getBR() {
+        return { x: this.maxX, y: this.minY };
+    }
+
+    getTL() {
+        return { x: this.minX, y: this.maxY };
+    }
+
     getTR() {
         return { x: this.maxX, y: this.maxY };
     }

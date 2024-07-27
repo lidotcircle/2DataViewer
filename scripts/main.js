@@ -1,5 +1,5 @@
 import { BoundingBox } from './common.js';
-import { commandLineBar, currentFrame, cursorBox, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, rotateLeftAtOrigin, rotateRightAtOrigin, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
+import { commandLineBar, currentFrame, cursorBox, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, mirrorXAxis, mirrorYAxis, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, rotateLeftAtOrigin, rotateRightAtOrigin, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
 import { ObjectFilter } from './object-filter.js';
 import { Viewport } from './viewport.js';
 
@@ -91,6 +91,8 @@ scaleUp.addEventListener(
     'click', () => viewport.ScaleUp(viewport.viewportCenter));
 scaleDown.addEventListener(
     'click', () => viewport.ScaleDown(viewport.viewportCenter));
+mirrorXAxis.addEventListener('click', () => viewport.MirrorX());
+mirrorYAxis.addEventListener('click', () => viewport.MirrorY());
 rotateLeftAtOrigin.addEventListener(
     'click', () => viewport.RotateAround(-45, viewport.viewportCenter));
 rotateRightAtOrigin.addEventListener(
