@@ -1179,8 +1179,7 @@ class Viewport {
         }
         X = X || 0;
         Y = Y || 0;
-        const pt = this.realCoordToViewport({ x: X, y: Y });
-        this.rotateAtToViewport(clockwiseDegree, pt.x, pt.y);
+        this.rotateAtToViewport(clockwiseDegree, X, Y);
     }
 
     /** @public */
@@ -1258,7 +1257,7 @@ class Viewport {
      * @public
      */
     get viewportCenter() {
-        return { x: this.viewportWidth / 2, y: this.viewportHeight / 22 };
+        return { x: this.viewportWidth / 2, y: this.viewportHeight / 2 };
     }
 
     /**

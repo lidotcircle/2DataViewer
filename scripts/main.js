@@ -91,8 +91,10 @@ scaleUp.addEventListener(
     'click', () => viewport.ScaleUp(viewport.viewportCenter));
 scaleDown.addEventListener(
     'click', () => viewport.ScaleDown(viewport.viewportCenter));
-rotateLeftAtOrigin.addEventListener('click', () => viewport.RotateAround(-45));
-rotateRightAtOrigin.addEventListener('click', () => viewport.RotateAround(45));
+rotateLeftAtOrigin.addEventListener(
+    'click', () => viewport.RotateAround(-45, viewport.viewportCenter));
+rotateRightAtOrigin.addEventListener(
+    'click', () => viewport.RotateAround(45, viewport.viewportCenter));
 moveLeft.addEventListener('click', () => viewport.MoveLeft());
 moveRight.addEventListener('click', () => viewport.MoveRight());
 moveUp.addEventListener('click', () => viewport.MoveUp());
