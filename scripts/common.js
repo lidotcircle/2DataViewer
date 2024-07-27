@@ -6,6 +6,20 @@ function PointSub(p1, p2) {
     return { x: p1.x - p2.x, y: p1.y - p2.y };
 }
 
+function VecResize(vec, size) {
+    const length = Math.sqrt(vec.x * vec.x + vec.y * vec.y);
+    return { x: vec.x * size / length, y: vec.y * size / length };
+}
+
+function VecLength(vec) {
+    return Math.sqrt(vec.x * vec.x + vec.y * vec.y);
+}
+
+function Perpendicular(vec) {
+    return { x: -vec.y, y: vec.x };
+}
+
+
 class AffineTransformation {
     constructor(a, b, c, d, tx, ty) {
         this.a = a || 1;
@@ -275,6 +289,9 @@ export {
     Box2boxTransformation,
     PointSub,
     PointAdd,
+    VecResize,
+    VecLength,
+    Perpendicular,
     invertColor,
     findLineSegmentIntersection
 };

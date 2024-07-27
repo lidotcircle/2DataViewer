@@ -1,4 +1,4 @@
-import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, PointAdd, PointSub } from './common.js';
+import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, Perpendicular, PointAdd, PointSub, VecLength, VecResize } from './common.js';
 import { DrawItem } from './draw-item.js';
 import { ObjectFilter } from './object-filter.js';
 import { parseTokens, tokenize } from './shape-parser.js';
@@ -184,6 +184,7 @@ class Viewport {
         this.m_selectionBox = document.createElement('canvas');
         this.m_selectedItemsCanvas = document.createElement('canvas');
         this.m_coordinationBox = document.createElement('canvas');
+        this.m_floatCoordination = document.createElement('canvas');
 
         this.m_canvasListElement = document.createElement('div');
         this.m_canvasListElement.style.position = 'relative';
@@ -191,7 +192,8 @@ class Viewport {
 
         const canvasList = [
             this.m_defaultDrawingCanvas, this.m_selectionBox,
-            this.m_selectedItemsCanvas, this.m_coordinationBox
+            this.m_selectedItemsCanvas, this.m_coordinationBox,
+            this.m_floatCoordination
         ];
         for (let canvas of canvasList) {
             this.m_canvasListElement.appendChild(canvas);
@@ -287,6 +289,7 @@ class Viewport {
         }
         ans.push(this.m_selectionBox);
         ans.push(this.m_selectedItemsCanvas);
+        ans.push(this.m_floatCoordination);
         return ans;
     }
 
@@ -662,6 +665,80 @@ class Viewport {
         this.refreshCoordination();
     }
 
+    /**
+     * @param {boolean} render
+     * @private
+     */
+    refreshFloatCoordination(render) {
+        let ctx = this.m_floatCoordination.getContext('2d');
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        if (!render) {
+            return;
+        }
+        ctx.fillStyle = 'rgba(100, 160, 200, 0.8)';
+        ctx.strokeStyle = 'rgba(60, 60, 60, 0.5)';
+        this.viewportCoordToCanvas({ x: 0, y: 0 });
+        this.viewportCoordToCanvas({ x: 100, y: 0 });
+        const origin = this.realCoordToViewport({ x: 0, y: 0 });
+        const originPx = this.realCoordToViewport({ x: 100, y: 0 });
+        const originPy = this.realCoordToViewport({ x: 0, y: 100 });
+        const xdirection = VecResize(PointSub(originPx, origin), 20);
+        const ydirection = VecResize(PointSub(originPy, origin), 20);
+        const _P0 = { x: 30, y: this.viewportHeight - 30 };
+        const _P1 = PointAdd(_P0, xdirection);
+        const _P2 = PointAdd(_P0, ydirection);
+        const maxX = Math.max(_P0.x, _P1.x, _P2.x);
+        const minY = Math.min(_P0.y, _P1.y, _P2.y);
+        const diff = PointSub(_P0, { x: maxX, y: minY });
+        const P0 = PointAdd(_P0, diff);
+        const P1 = PointAdd(_P1, diff);
+        const P2 = PointAdd(_P2, diff);
+
+        const segs = [];
+        const CP0 = this.viewportCoordToCanvas(P0);
+        const CP1 = this.viewportCoordToCanvas(P1);
+        const CP2 = this.viewportCoordToCanvas(P2);
+        const lineWidth = 2 * VecLength(PointSub(CP2, CP0)) / 20;
+        segs.push([CP0, CP1]);
+        segs.push([CP0, CP2]);
+        for (let seg of segs) {
+            const path = new Path2D();
+            path.lineTo(seg[0].x, seg[0].y);
+            path.lineTo(seg[1].x, seg[1].y);
+            ctx.strokeStyle = 'rgba(60, 60, 60, 0.5)';
+            ctx.lineWidth = lineWidth;
+            ctx.stroke(path);
+        }
+
+        const polygons = [];
+        const arrowLength = 3 * lineWidth;
+        {
+            const p0 = PointAdd(CP1, VecResize(PointSub(CP0, CP1), arrowLength));
+            const vx = VecResize(Perpendicular(PointSub(CP1, CP0)), arrowLength / 3);
+            const p1 = PointAdd(p0, vx);
+            const p2 = PointSub(p0, vx);
+            polygons.push(["rgba(250, 100, 100, 0.8)", [CP1, p1, p2]]);
+        }
+        {
+            const p0 = PointAdd(CP2, VecResize(PointSub(CP0, CP2), arrowLength));
+            const vx = VecResize(Perpendicular(PointSub(CP0, CP2)), arrowLength / 3);
+            const p1 = PointAdd(p0, vx);
+            const p2 = PointSub(p0, vx);
+            polygons.push(["rgba(100, 100, 250, 0.8)", [CP2, p1, p2]]);
+        }
+        for (let [color, polygon] of polygons) {
+            const path = new Path2D();
+            path.moveTo(polygon[0].x, polygon[0].y);
+            for (let i = 1; i < polygon.length; i++) {
+                path.lineTo(polygon[i].x, polygon[i].y);
+            }
+            path.closePath();
+            ctx.fillStyle = color;
+            ctx.fill(path);
+        }
+    }
+
     /** @private */
     refreshCoordination() {
         const w1 = this.canvasWidth / 2;
@@ -741,7 +818,7 @@ class Viewport {
                 hlineViewportOpt[1] : hlineViewportOpt[0];
             const upPoint = PointAdd(arrowPoint, { x: -arrowLength, y: arrowLength / 3 });
             const downPoint = PointAdd(arrowPoint, { x: -arrowLength, y: -arrowLength / 3 });
-            polygons.push([arrowPoint, upPoint, downPoint]);
+            polygons.push(["rgba(250, 100, 100, 0.8)", [arrowPoint, upPoint, downPoint]]);
             const p1 = PointAdd(upPoint, { x: -arrowLength * 3 / 4, y: arrowLength / 4 });;
             const p2 = PointAdd(upPoint, { x: arrowLength / 4, y: arrowLength / 4 });;
             ctx.fillStyle = 'rgba(100, 160, 200, 0.8)';
@@ -752,7 +829,7 @@ class Viewport {
                 vlineViewportOpt[1] : vlineViewportOpt[0];
             const leftPoint = PointAdd(arrowPoint, { x: arrowLength / 3, y: -arrowLength });
             const rightPoint = PointAdd(arrowPoint, { x: -arrowLength / 3, y: -arrowLength });
-            polygons.push([arrowPoint, leftPoint, rightPoint]);
+            polygons.push(["rgba(100, 100, 250, 0.8)", [arrowPoint, leftPoint, rightPoint]]);
             const p1 = PointAdd(leftPoint, { x: -arrowLength * 1.4, y: -arrowLength / 4 });
             const p2 = PointAdd(p1, { x: arrowLength, y: 0 });
             ctx.fillStyle = 'rgba(100, 160, 200, 0.8)';
@@ -767,16 +844,18 @@ class Viewport {
             ctx.lineWidth = lineWidth;
             ctx.stroke(path);
         }
-        for (let polygon of polygons) {
+        for (let [color, polygon] of polygons) {
             const path = new Path2D();
             path.moveTo(polygon[0].x, polygon[0].y);
             for (let i = 1; i < polygon.length; i++) {
                 path.lineTo(polygon[i].x, polygon[i].y);
             }
             path.closePath();
-            ctx.fillStyle = 'rgba(60, 60, 60, 1)';
+            ctx.fillStyle = color;
             ctx.fill(path);
         }
+
+        this.refreshFloatCoordination(!hlineViewportOpt || !vlineViewportOpt);
     }
 
     /** @public */
