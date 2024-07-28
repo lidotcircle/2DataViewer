@@ -1,3 +1,4 @@
+import { DrawTextInCanvasAcrossLine } from './canvas-utils.js';
 import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, Perpendicular, PointAdd, PointSub, VecLength, VecResize } from './common.js';
 import { DrawItem } from './draw-item.js';
 import { ObjectFilter } from './object-filter.js';
@@ -429,156 +430,11 @@ class Viewport {
 
     /**
      * @param ctx { CanvasRenderingContext2D }
-     * @param from { {x: float, y: float } }
-     * @param to { {x: float, y: float } }
-     * @param height { float }
-     * @param text { string }
-     * @param ratio { float }
-     * @param ignoreLength { boolean }
-     * @private
-     */
-    static drawTextAtLine(ctx, from, to, height, text, ratio, ignoreLength) {
-        ctx.save();
-        ctx.textBaseline = 'bottom';
-        const expectedHeight = height;
-        ctx.font = '48px serif';
-        const m = ctx.measureText(text);
-        const c = PointAdd(from, to);
-        const diff = PointSub(from, to);
-        const atanv = Math.atan(diff.y / (diff.x == 0 ? 1 : diff.x));
-        const angle = diff.x == 0 ? (diff.y > 0 ? Math.PI / 2 : Math.PI * 1.5) :
-            (diff.x > 0 ? atanv : atanv + Math.PI);
-        const textheight =
-            m.actualBoundingBoxAscent - m.actualBoundingBoxDescent;
-        const len = Math.sqrt(diff.x * diff.x + diff.y * diff.y);
-        const s =
-            Math.min(
-                ignoreLength ? expectedHeight / textheight : len / m.width,
-                expectedHeight / textheight) *
-            ratio;
-        const t = AffineTransformation.translate(c.x / 2, c.y / 2)
-            .concat(AffineTransformation.rotate(-angle + Math.PI))
-            .concat(AffineTransformation.scale(s, s))
-            .concat(AffineTransformation.translate(
-                -m.width / 2, -textheight / 2))
-            .concat(new AffineTransformation(1, 0, 0, -1, 0, 0));
-        ctx.setTransform(ctx.getTransform().multiply(t.convertToDOMMatrix()));
-        ctx.fillText(text, 0, 0);
-        ctx.restore();
-    }
-
-    /**
-     * @param ctx { CanvasRenderingContext2D }
      * @param item { DrawItem }
      * @private
      */
     static drawItemInCanvas(ctx, item) {
-        if (item.type == 'line') {
-            ctx.strokeStyle = item.color;
-            ctx.lineWidth = item.width;
-            const path = new Path2D();
-            path.lineTo(item.point1.x, item.point1.y);
-            path.lineTo(item.point2.x, item.point2.y);
-            ctx.stroke(path);
-            if (item.comment) {
-                ctx.fillStyle = 'white';
-                this.drawTextAtLine(
-                    ctx, item.point1, item.point2, item.width, item.comment,
-                    0.95, false);
-            }
-        } else if (item.type == 'circle') {
-            ctx.fillStyle = item.color;
-            const path = new Path2D();
-            path.ellipse(
-                item.center.x, item.center.y, item.radius, item.radius, 0, 0,
-                360);
-            ;
-            ctx.fill(path);
-            if (item.comment) {
-                ctx.fillStyle = 'white';
-                this.drawTextAtLine(
-                    ctx, PointSub(item.center, { x: item.radius * 0.6, y: 0 }),
-                    PointAdd(item.center, { x: item.radius * 0.6, y: 0 }),
-                    item.radius * 1.2, item.comment, 0.95, false);
-            }
-        } else if (item.type == 'cline') {
-            ctx.strokeStyle = item.color;
-            ctx.lineWidth = item.width;
-            {
-                const path = new Path2D();
-                path.lineTo(item.point1.x, item.point1.y);
-                path.lineTo(item.point2.x, item.point2.y);
-                ctx.stroke(path);
-            }
-            {
-                ctx.fillStyle = item.color;
-                const path = new Path2D();
-                path.ellipse(
-                    item.point1.x, item.point1.y, item.width / 2,
-                    item.width / 2, 0, 0, 360);
-                ;
-                ctx.fill(path);
-            }
-            {
-                ctx.fillStyle = item.color;
-                const path = new Path2D();
-                path.ellipse(
-                    item.point2.x, item.point2.y, item.width / 2,
-                    item.width / 2, 0, 0, 360);
-                ;
-                ctx.fill(path);
-            }
-            if (item.comment) {
-                ctx.fillStyle = 'white';
-                this.drawTextAtLine(
-                    ctx, item.point1, item.point2, item.width, item.comment,
-                    0.95, false);
-            }
-        } else if (item.type == 'polygon') {
-            ctx.fillStyle = item.color;
-            let pointSum = { x: 0, y: 0 };
-            {
-                const path = new Path2D();
-                for (let p of item.points) {
-                    path.lineTo(p.x, p.y);
-                    pointSum.x += p.x;
-                    pointSum.y += p.y;
-                }
-                path.closePath();
-                ctx.fill(path);
-            }
-            if (item.comment) {
-                const center = {
-                    x: pointSum.x / item.points.length,
-                    y: pointSum.y / item.points.length
-                };
-                let rsumx = 0, rsumy = 0;
-                for (let p of item.points) {
-                    const vec = PointSub(center, p);
-                    rsumx += Math.sqrt(vec.x * vec.x);
-                    rsumy += Math.sqrt(vec.y * vec.y);
-                }
-                const ravgx = rsumx / item.points.length;
-                const ravgy = rsumy / item.points.length;
-                let qsumx = 0, qsumy = 0;
-                for (let p of item.points) {
-                    const vec = PointSub(center, p);
-                    qsumx += Math.pow(Math.sqrt(vec.x * vec.x) - ravgx, 2);
-                    qsumy += Math.pow(Math.sqrt(vec.y * vec.y) - ravgy, 2);
-                }
-                const qavgx = Math.sqrt(qsumx / item.points.length);
-                const qavgy = Math.sqrt(qsumy / item.points.length);
-                const radius =
-                    Math.min(ravgx - 0.5 * qavgx, ravgy - 0.5 * qavgy);
-                if (radius > 1) {
-                    ctx.fillStyle = 'white';
-                    this.drawTextAtLine(
-                        ctx, PointSub(center, { x: radius * 0.6, y: 0 }),
-                        PointAdd(center, { x: radius * 0.6, y: 0 }), radius * 1.2,
-                        item.comment, 0.95, false);
-                }
-            }
-        }
+        item.rendering(ctx);
     }
 
     /** @private */
@@ -822,7 +678,7 @@ class Viewport {
             const p1 = PointAdd(upPoint, { x: -arrowLength * 3 / 4, y: arrowLength / 4 });;
             const p2 = PointAdd(upPoint, { x: arrowLength / 4, y: arrowLength / 4 });;
             ctx.fillStyle = 'rgba(100, 160, 200, 0.8)';
-            Viewport.drawTextAtLine(ctx, p1, p2, arrowLength * 0.7, 'y', 0.95, true);
+            DrawTextInCanvasAcrossLine(ctx, p1, p2, arrowLength * 0.7, 'y', 0.95, true);
         }
         if (vlineOpt && vlineViewportOpt) {
             const arrowPoint = vlineViewportOpt[0].y < vlineViewportOpt[1].y ?
@@ -833,7 +689,7 @@ class Viewport {
             const p1 = PointAdd(leftPoint, { x: -arrowLength * 1.4, y: -arrowLength / 4 });
             const p2 = PointAdd(p1, { x: arrowLength, y: 0 });
             ctx.fillStyle = 'rgba(100, 160, 200, 0.8)';
-            Viewport.drawTextAtLine(ctx, p1, p2, arrowLength * 0.7, 'x', 1.25, true);
+            DrawTextInCanvasAcrossLine(ctx, p1, p2, arrowLength * 0.7, 'x', 1.25, true);
         }
 
         for (let seg of segs) {
@@ -942,14 +798,28 @@ class Viewport {
         this.updateCanvasCSSMatrix();
         ctx.setTransform(this.getCanvasDOMMatrixTransform());
 
-        for (const obj of this.m_selectedObjects) {
-            const oldColor = obj.color;
-            try {
-                obj.color = 'rgba(200, 200, 230, 0.3)';
-                Viewport.drawItemInCanvas(ctx, obj);
-            } finally {
-                obj.color = oldColor;
+        const ctxProxy = new Proxy(ctx, {
+            set: function(_target, prop, value) {
+                if (prop == 'strokeStyle' || prop == 'fillStyle') {
+                    value = 'rgba(200, 200, 230, 0.3)';
+                }
+                _target[prop] = value;
+                return true;
+            },
+            get: function(target, prop, receiver) {
+                if (prop == 'strokeStyle' || prop == 'fillStyle') {
+                    return 'rgba(200, 200, 230, 0.3)';
+                }
+                const ans = Reflect.get(target, prop, receiver);
+                if (typeof ans == 'function') {
+                    return ans.bind(target);
+                }
+                return ans;
             }
+        });
+
+        for (const obj of this.m_selectedObjects) {
+            Viewport.drawItemInCanvas(ctxProxy, obj);
         }
     }
 
