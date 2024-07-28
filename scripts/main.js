@@ -1,7 +1,7 @@
+import { Application } from './application.js';
 import { BoundingBox } from './common.js';
-import { commandLineBar, currentFrame, cursorBox, cursorCoordination, errorBar, fitScreen, framePerSec, fullviewport, inputBar, mirrorXAxis, mirrorYAxis, moveDown, moveLeft, moveRight, moveUp, objectDetail, objectDetailCount, objectDetailText, play, progress, reset, rotateLeftAtOrigin, rotateRightAtOrigin, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
-import { ObjectFilter } from './object-filter.js';
-import { Viewport } from './viewport.js';
+import { commandLineBar, currentFrame, cursorCoordination, errorBar, fitScreen, framePerSec, inputBar, mirrorXAxis, mirrorYAxis, moveDown, moveLeft, moveRight, moveUp, objectDetail, play, progress, reset, rotateLeftAtOrigin, rotateRightAtOrigin, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
+import { MultiFrameSource } from './multi-frame-source.js';
 
 
 function showError(msg) {
@@ -10,21 +10,13 @@ function showError(msg) {
     setTimeout(() => errorBar.classList.remove('error-bar-show'), 2000);
 }
 
-const viewport = new Viewport('viewport', new ObjectFilter('object-filter'));
+const app = new Application('viewport');
 
-viewport.frameCountObservable.subscribe((n) => {
-    if (currentFrame.valueAsNumber != n) {
-        currentFrame.value = Math.min(currentFrame.valueAsNumber, n);
-    }
+app.HoverPositionObservable.subscribe((pt) => {
+    cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
 });
 
-viewport.selectedItemsCountObservable.subscribe((n) => {
-    objectDetailCount.innerText = n;
-});
-
-viewport.selectedItemsTextObservable.subscribe((text) => {
-    objectDetailText.innerText = text;
-});
+const viewport = app.Viewport;
 
 viewport.errorObservable.subscribe((msg) => {
     showError(msg);
@@ -102,80 +94,6 @@ moveRight.addEventListener('click', () => viewport.MoveRight());
 moveUp.addEventListener('click', () => viewport.MoveUp());
 moveDown.addEventListener('click', () => viewport.MoveDown());
 
-cursorBox.addEventListener('wheel', (e) => {
-    if (e.deltaY < 0) {
-        viewport.ScaleUp(e.offsetX, e.offsetY);
-    } else if (e.deltaY > 0) {
-        viewport.ScaleDown(e.offsetX, e.offsetY);
-    }
-});
-
-let isInDragMode = false;
-let dragModePrevPt = {};
-let isInSelectionMode = false;
-let selectionStart = {};
-function enterDragMode(pt) {
-    isInDragMode = true;
-    dragModePrevPt = pt
-    fullviewport.classList.add('drag-mode');
-}
-function leaveDragMode() {
-    isInDragMode = false;
-    fullviewport.classList.remove('drag-mode');
-}
-function enterSelectionMode(pt) {
-    isInSelectionMode = true;
-    selectionStart = pt
-    fullviewport.classList.add('selection-mode');
-    viewport.SelectBoxInViewport(pt, pt);
-}
-function leaveSelectionMode() {
-    isInSelectionMode = false;
-    fullviewport.classList.remove('selection-mode');
-    viewport.clearSelection();
-}
-
-fullviewport.addEventListener('mousemove', (e) => {
-    if (isInDragMode) {
-        viewport.translateInViewport(
-            e.offsetX - dragModePrevPt.x, e.offsetY - dragModePrevPt.y);
-        viewport.refreshDrawingCanvas();
-        dragModePrevPt = { x: e.offsetX, y: e.offsetY };
-    } else {
-        const pt = viewport.viewportCoordToReal({ x: e.offsetX, y: e.offsetY });
-        cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
-
-        if (isInSelectionMode) {
-            viewport.SelectBoxInViewport(
-                selectionStart, { x: e.offsetX, y: e.offsetY });
-        }
-    }
-});
-fullviewport.addEventListener('mousedown', (e) => {
-    if ((e.buttons & 4) != 0) {
-        enterDragMode({ x: e.offsetX, y: e.offsetY });
-    }
-    if ((e.buttons & 1) != 0) {
-        enterSelectionMode({ x: e.offsetX, y: e.offsetY });
-    }
-});
-fullviewport.addEventListener('mouseleave', () => {
-    leaveDragMode();
-    leaveSelectionMode();
-});
-fullviewport.addEventListener('mouseup', (e) => {
-    if ((e.buttons & 4) == 0) {
-        leaveDragMode();
-    }
-    if ((e.buttons & 1) == 0) {
-        leaveSelectionMode();
-    }
-});
-fullviewport.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-});
-
 function hideInputBar() {
     inputBar.classList.remove('input-bar-show');
 }
@@ -247,7 +165,7 @@ window.addEventListener('keyup', async (e) => {
         await viewport.GotoFrame(viewport.CurrentFrame + 1);
         updateProgress();
     } else if (e.key == 'Escape') {
-        viewport.clearSelection();
+        viewport.clearSelectionBox();
         viewport.drawSelectedItem();
         hideInputBar();
     } else if (e.key == 'Delete') {
@@ -272,38 +190,50 @@ async function setupConnection() {
         nframes = data['nframes'];
     }
 
-    viewport.SetDataSource(box, nframes, async (n) => {
-        const API = location.protocol + '//' + location.host + '/frame/' + n;
+    const multiFrameSource = new MultiFrameSource(box, async (n) => {
+        const API = `${location.protocol}//${location.host}/frame/${n}`;
         const resp = await fetch(API);
         const data = await resp.json();
         return JSON.stringify(data['drawings'] || []);
-    });
-    updateProgress();
-    updatePlayIcon();
+    }, nframes);
 
-    framePerSec.addEventListener('change', () => {
-        framePerSecondValue = framePerSec.valueAsNumber;
+    multiFrameSource.nextFrameObservable.subscribe((drawItems) => {
+        app.SetDrawingObjects(drawItems);
+        console.debug(drawItems);
     });
-    currentFrame.addEventListener('change', () => {
-        viewport.GotoFrame(currentFrame.valueAsNumber - 1);
-        updateProgress();
+
+    const loopPromise = multiFrameSource.LoopTillEnd();
+    loopPromise.catch((e) => {
+        console.error(e);
     });
-    let framePerSecondValue = 1;
-    let prevFresh = Date.now();
-    while (true) {
-        const now = Date.now();
-        const nextTimeout =
-            Math.max(0, prevFresh + 1000 / framePerSecondValue - now);
-        await new Promise(r => setTimeout(r, nextTimeout));
-        prevFresh = Date.now();
-        if (!viewport.Paused) {
-            try {
-                await viewport.GotoFrame(viewport.CurrentFrame + 1);
-                updateProgress();
-            } catch {
-            }
-        }
-    };
+
+
+    // updateProgress();
+    // updatePlayIcon();
+
+    // framePerSec.addEventListener('change', () => {
+    //     framePerSecondValue = framePerSec.valueAsNumber;
+    // });
+    // currentFrame.addEventListener('change', () => {
+    //     viewport.GotoFrame(currentFrame.valueAsNumber - 1);
+    //     updateProgress();
+    // });
+    // let framePerSecondValue = 1;
+    // let prevFresh = Date.now();
+    // while (true) {
+    //     const now = Date.now();
+    //     const nextTimeout =
+    //         Math.max(0, prevFresh + 1000 / framePerSecondValue - now);
+    //     await new Promise(r => setTimeout(r, nextTimeout));
+    //     prevFresh = Date.now();
+    //     if (!viewport.Paused) {
+    //         try {
+    //             await viewport.GotoFrame(viewport.CurrentFrame + 1);
+    //             updateProgress();
+    //         } catch {
+    //         }
+    //     }
+    // };
 }
 
 setupConnection();

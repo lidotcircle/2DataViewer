@@ -206,56 +206,178 @@ function Box2boxTransformation(box1, box2) {
         .concat(new AffineTransformation(1, 0, 0, 1, -c1.x, -c1.y));
 }
 
+function HTMLColorStringToRGBAInternal(color) {
+    const div = document.createElement('div');
+    div.style.color = color;
+    document.body.appendChild(div);
+    const colorValue = window.getComputedStyle(div).color;
+    document.body.removeChild(div);
+    const rgba = colorValue.match(/\d+/g).map(Number);
+    return { r: rgba[0], g: rgba[1], b: rgba[2], a: rgba[3] };
+}
+
+function HTMLColorStringToRGBA(color) {
+    const rgba = HTMLColorStringToRGBAInternal(color);
+    return `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${rgba.a / 255})`;
+}
+
+/** blend different colors with different modes */
+class ColorBlender {
+    constructor(upperColor, lowerColor) {
+        this.m_upperColor = upperColor;
+        this.m_lowerColor = lowerColor;
+    }
+
+    normal() {
+        return this.m_upperColor;
+    }
+
+    dissolve() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const a = upper.a / 255;
+        const r = upper.r * a + lower.r * (1 - a);
+        const g = upper.g * a + lower.g * (1 - a);
+        const b = upper.b * a + lower.b * (1 - a);
+        return `rgba(${r}, ${g}, ${b}, 1)`;
+    }
+
+    multiply() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = upper.r * lower.r / 255;
+        const g = upper.g * lower.g / 255;
+        const b = upper.b * lower.b / 255;
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    screen() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = 255 - (255 - upper.r) * (255 - lower.r) / 255;
+        const g = 255 - (255 - upper.g) * (255 - lower.g) / 255;
+        const b = 255 - (255 - upper.b) * (255 - lower.b) / 255;
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    overlay() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = upper.r < 128 ? 2 * upper.r * lower.r / 255 : 255 - 2 * (255 - upper.r) * (255 - lower.r) / 255;
+        const g = upper.g < 128 ? 2 * upper.g * lower.g / 255 : 255 - 2 * (255 - upper.g) * (255 - lower.g) / 255;
+        const b = upper.b < 128 ? 2 * upper.b * lower.b / 255 : 255 - 2 * (255 - upper.b) * (255 - lower.b) / 255;
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    hardLight() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = lower.r < 128 ? 2 * upper.r * lower.r / 255 : 255 - 2 * (255 - upper.r) * (255 - lower.r) / 255;
+        const g = lower.g < 128 ? 2 * upper.g * lower.g / 255 : 255 - 2 * (255 - upper.g) * (255 - lower.g) / 255;
+        const b = lower.b < 128 ? 2 * upper.b * lower.b / 255 : 255 - 2 * (255 - upper.b) * (255 - lower.b) / 255;
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    softLight() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = lower.r < 128 ?
+            (2 * upper.r + lower.r - 255) * lower.r / 255 :
+            255 - (2 * (255 - upper.r) + lower.r) * (255 - lower.r) / 255;
+        const g = lower.g < 128 ?
+            (2 * upper.g + lower.g - 255) * lower.g / 255 :
+            255 - (2 * (255 - upper.g) + lower.g) * (255 - lower.g) / 255;
+        const b = lower.b < 128 ?
+            (2 * upper.b + lower.b - 255) * lower.b / 255 :
+            255 - (2 * (255 - upper.b) + lower.b) * (255 - lower.b) / 255;
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    difference() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = Math.abs(upper.r - lower.r);
+        const g = Math.abs(upper.g - lower.g);
+        const b = Math.abs(upper.b - lower.b);
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    exclusion() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = (upper.r + lower.r - 2 * upper.r * lower.r / 255);
+        const g = (upper.g + lower.g - 2 * upper.g * lower.g / 255);
+        const b = (upper.b + lower.b - 2 * upper.b * lower.b / 255);
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    colorDodge() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = lower.r === 255 ? 255 : Math.min(255, upper.r * 255 / (255 - lower.r));
+        const g = lower.g === 255 ? 255 : Math.min(255, upper.g * 255 / (255 - lower.g));
+        const b = lower.b === 255 ? 255 : Math.min(255, upper.b * 255 / (255 - lower.b));
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    colorBurn() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = lower.r === 0 ? 0 : Math.max(0, 255 - (255 - upper.r) * 255 / lower.r);
+        const g = lower.g === 0 ? 0 : Math.max(0, 255 - (255 - upper.g) * 255 / lower.g);
+        const b = lower.b === 0 ? 0 : Math.max(0, 255 - (255 - upper.b) * 255 / lower.b);
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    linearBurn() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = Math.max(0, upper.r + lower.r - 255);
+        const g = Math.max(0, upper.g + lower.g - 255);
+        const b = Math.max(0, upper.b + lower.b - 255);
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    linearDodge() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = Math.min(255, upper.r + lower.r);
+        const g = Math.min(255, upper.g + lower.g);
+        const b = Math.min(255, upper.b + lower.b);
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    vividLight() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = lower.r < 128 ?
+            this.colorBurn().r : this.colorDodge().r;
+        const g = lower.g < 128 ?
+            this.colorBurn().g : this.colorDodge().g;
+        const b = lower.b < 128 ?
+            this.colorBurn().b : this.colorDodge().b;
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+
+    pinLight() {
+        const upper = HTMLColorStringToRGBAInternal(this.m_upperColor);
+        const lower = HTMLColorStringToRGBAInternal(this.m_lowerColor);
+        const r = lower.r < 128 ?
+            Math.min(this.darken().r, upper.r) :
+            Math.max(this.lighten().r, upper.r);
+        const g = lower.g < 128 ?
+            Math.min(this.darken().g, upper.g) :
+            Math.max(this.lighten().g, upper.g);
+        const b = lower.b < 128 ?
+            Math.min(this.darken().b, upper.b) :
+            Math.max(this.lighten().b, upper.b);
+        return `rgba(${r}, ${g}, ${b}, ${upper.a / 255})`;
+    }
+};
+
 function invertColor(color) {
-    // Convert named colors to hexadecimal
-    const colors = {
-        'black': '#000000',
-        'white': '#ffffff',
-        'red': '#ff0000',
-        'lime': '#00ff00',
-        'blue': '#0000ff',
-        'yellow': '#ffff00',
-        'cyan': '#00ffff',
-        'magenta': '#ff00ff',
-        'silver': '#c0c0c0',
-        'gray': '#808080',
-        'maroon': '#800000',
-        'olive': '#808000',
-        'green': '#008000',
-        'purple': '#800080',
-        'teal': '#008080',
-        'navy': '#000080',
-        // Add more named colors if needed
-    };
-
-    if (colors[color.toLowerCase()]) {
-        color = colors[color.toLowerCase()];
-    }
-
-    // Convert hex format to RGB
-    if (color[0] === '#') {
-        color = color.slice(1);  // Remove '#'
-        if (color.length === 3) {
-            color = color[0] + color[0] + color[1] + color[1] + color[2] +
-                color[2];  // Convert 3-digit hex to 6-digit
-        }
-        const r = parseInt(color.substr(0, 2), 16);
-        const g = parseInt(color.substr(2, 2), 16);
-        const b = parseInt(color.substr(4, 2), 16);
-        color = `rgb(${r},${g},${b})`;  // Convert to RGB
-    }
-
-    // Invert RGB (and optionally RGBA)
-    if (color.includes('rgba')) {
-        let [r, g, b, a] = color.match(/\d+/g).map(Number);
-        return `rgba(${255 - r},${255 - g},${255 - b},${a})`;
-    } else if (color.includes('rgb')) {
-        let [r, g, b] = color.match(/\d+/g).map(Number);
-        return `rgb(${255 - r},${255 - g},${255 - b})`;
-    }
-
-    // If the format is not recognized, return the original
-    return color;
+    const [r, g, b, a] = color.match(/\d+/g).map(Number);
+    return `rgba(${255 - r}, ${255 - g}, ${255 - b}, ${a})`;
 }
 
 function findLineSegmentIntersection(A, B, C, D) {
@@ -283,6 +405,22 @@ function findLineSegmentIntersection(A, B, C, D) {
     return null;  // No intersection
 }
 
+/**
+ * @param {(timeStamp: DOMHighResTimeStamp) => void} func
+ * @return {Promise<int>}
+ */
+function runBeforeNextFrame(func) {
+    return new Promise((resolve, reject) => {
+        window.requestAnimationFrame(() => {
+            try {
+                resolve(func());
+            } catch (e) {
+                reject(e);
+            }
+        });
+    });
+}
+
 export {
     AffineTransformation,
     BoundingBox,
@@ -293,5 +431,8 @@ export {
     VecLength,
     Perpendicular,
     invertColor,
-    findLineSegmentIntersection
+    HTMLColorStringToRGBA,
+    ColorBlender,
+    findLineSegmentIntersection,
+    runBeforeNextFrame,
 };
