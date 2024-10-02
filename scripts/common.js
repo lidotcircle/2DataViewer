@@ -421,6 +421,16 @@ function runBeforeNextFrame(func) {
     });
 }
 
+/**
+ * @param {Object.<string, string>} styleKeyValues
+ * @return {string}
+ */
+function genStyle(styleKeyValues) {
+    return Object.entries(styleKeyValues)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(';');
+}
+
 export {
     AffineTransformation,
     BoundingBox,
@@ -435,4 +445,5 @@ export {
     ColorBlender,
     findLineSegmentIntersection,
     runBeforeNextFrame,
+    genStyle,
 };

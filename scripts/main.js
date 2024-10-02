@@ -1,6 +1,6 @@
 import { Application } from './application.js';
 import { BoundingBox } from './common.js';
-import { commandLineBar, currentFrame, cursorCoordination, errorBar, fitScreen, framePerSec, inputBar, mirrorXAxis, mirrorYAxis, moveDown, moveLeft, moveRight, moveUp, objectDetail, play, progress, reset, rotateLeftAtOrigin, rotateRightAtOrigin, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
+import { commandLineBar, cursorCoordination, errorBar, fitScreen, inputBar, mirrorXAxis, mirrorYAxis, moveDown, moveLeft, moveRight, moveUp, objectDetail, play, progress, reset, rotateLeftAtOrigin, rotateRightAtOrigin, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
 import { MultiFrameSource } from './multi-frame-source.js';
 
 

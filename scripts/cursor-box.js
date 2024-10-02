@@ -1,14 +1,19 @@
-import { BoundingBox } from './common.js';
+import { BoundingBox, genStyle } from './common.js';
 import { Subject } from './thirdparty/rxjs.js';
+import Van from './thirdparty/van.js';
 
 
-class AppEvents {
-    /**
-     * @param {HTMLElement} cursorBoxElem
-     */
-    constructor(cursorBoxElem) {
+class CursorBox {
+    constructor() {
         /** @private */
-        this.m_cursorBoxElem = cursorBoxElem;
+        this.m_cursorBoxElem = Van.tags.div({
+            style: genStyle({
+                width: '100%',
+                height: '100%',
+                position: 'absolute',
+                top: '0em'
+            })
+        });
         /** @private */
         this.m_selectionEventSubject = new Subject();
         /** @private */
@@ -85,6 +90,10 @@ class AppEvents {
         });
     }
 
+    get element() {
+        return this.m_cursorBoxElem;
+    }
+
     get selectionEventObservable() {
         return this.m_selectionEventSubject;
     }
@@ -110,4 +119,4 @@ class AppEvents {
     }
 };
 
-export { AppEvents };
+export { CursorBox };

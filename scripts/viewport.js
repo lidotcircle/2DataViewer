@@ -47,14 +47,15 @@ class ViewportDrawingLayer {
 
 class Viewport {
     /**
-     * @param {string} canvasId
+     * @param {string | null} canvasId
      */
     constructor(canvasId) {
         /**
          * @type HTMLDivElement
          * @private
          */
-        this.m_viewportEl = document.getElementById(canvasId);
+        this.m_viewportEl = canvasId ? document.getElementById(canvasId) :
+            document.createElement('div');
         this.m_viewportEl.style.width = '100%';
         this.m_viewportEl.style.height = '100%';
         this.m_viewportEl.style.background = '#2c2929';
@@ -957,6 +958,9 @@ class Viewport {
     ViewportCoordToGlobalCoord(point) {
         return this.viewportCoordToReal(point);
     }
+
+    /** @public */
+    get element() { return this.m_viewportEl; }
 
     /**
      * @return { { x: float, y: float } }

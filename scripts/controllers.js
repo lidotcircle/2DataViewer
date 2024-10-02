@@ -10,8 +10,6 @@ const inputBar = document.getElementById('input-bar');
 const errorBar = document.getElementById('error-bar');
 const progress = document.getElementById('progress');
 const timestamp = document.getElementById('timestamp');
-const fullviewport = document.getElementById('fullviewport');
-const cursorBox = fullviewport.querySelector('.cursor-box');
 const fitScreen = document.getElementById('fit-screen');
 const reset = document.getElementById('reset');
 const scaleUp = document.getElementById('scale-up');
@@ -40,8 +38,6 @@ export {
     errorBar,
     progress,
     timestamp,
-    fullviewport,
-    cursorBox,
     fitScreen,
     reset,
     scaleUp,

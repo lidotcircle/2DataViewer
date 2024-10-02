@@ -1,17 +1,30 @@
-import { AppEvents } from './app-events.js';
+import { CursorBox } from './cursor-box.js';
 import { ObjectFilter } from './object-filter.js';
 import { ObjectManager } from './object-manager.js';
 import { SettingManager } from './settings.js';
 import { Viewport } from './viewport.js';
-import { cursorBox } from './controllers.js';
 import { Subject } from './thirdparty/rxjs.js';
 import { DrawItem } from './draw-item.js';
 import { BoundingBox } from './common.js';
+import Van from './thirdparty/van.js';
+
 
 class Application {
-    constructor(viewportId) {
+    constructor() {
         /** @private */
-        this.m_viewport = new Viewport(viewportId);
+        this.m_viewport = new Viewport();
+        /** @private */
+        this.m_appEvents = new CursorBox();
+
+        /**
+         * @type {HTMLElement}
+         * @private
+         */
+        this.m_appElement = Van.tags.div({ class: 'screen' },
+            this.m_viewport.element,
+            this.m_appEvents.element,
+        );
+
         /** @private */
         this.m_objectFilter = new ObjectFilter('object-filter');
         /** @private */
@@ -19,8 +32,6 @@ class Application {
         /** @private */
         this.m_objectManager =
             new ObjectManager(this.m_objectFilter, this.m_settingManager);
-        /** @private */
-        this.m_appEvents = new AppEvents(cursorBox);
 
         /** @private */
         this.m_hoverPositionSubject = new Subject();
