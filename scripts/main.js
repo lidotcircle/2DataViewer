@@ -2,6 +2,9 @@ import { Application } from './application.js';
 import { BoundingBox } from './common.js';
 import { commandLineBar, cursorCoordination, errorBar, fitScreen, inputBar, mirrorXAxis, mirrorYAxis, moveDown, moveLeft, moveRight, moveUp, objectDetail, play, progress, reset, rotateLeftAtOrigin, rotateRightAtOrigin, scaleDown, scaleUp, stop, timestamp } from './controllers.js';
 import { MultiFrameSource } from './multi-frame-source.js';
+import { KeyRegexFilter, ObjectFilter } from './object-filter.js';
+import { ObjectViewer } from './object-viewer.js';
+import van from './thirdparty/van.js';
 
 
 function showError(msg) {
@@ -10,7 +13,31 @@ function showError(msg) {
     setTimeout(() => errorBar.classList.remove('error-bar-show'), 2000);
 }
 
-const app = new Application('viewport');
+class MainApp {
+    constructor() {
+        this.m_selectedObjects = van.reactive([]);
+        this.m_objectViewer = new ObjectViewer(this.m_selectedObjects);
+        setInterval(() => {
+            // this.m_objectViewer.toggle();
+            this.m_selectedObjects.push({ x: Math.random(), y: Math.random() });
+        }, 1000);
+        this.m_objectFilter = new ObjectFilter('object-filter');
+        this.m_objectFilter.addFilter(new KeyRegexFilter("layer", "layer1"));
+    }
+
+    /** @param {HTMLElement} dom */
+    render(dom) {
+        return van.tags.div({ class: 'container' }, [
+            this.m_objectViewer,
+            this.m_objectFilter,
+        ]);
+    }
+}
+
+/*
+const app = new Application();
+const container = document.querySelector('.container');
+container.append(app.m_appElement)
 
 app.HoverPositionObservable.subscribe((pt) => {
     cursorCoordination.innerHTML = `(${pt.x}, ${pt.y})`;
@@ -166,7 +193,7 @@ window.addEventListener('keyup', async (e) => {
         updateProgress();
     } else if (e.key == 'Escape') {
         viewport.clearSelectionBox();
-        viewport.drawSelectedItem();
+        viewport.DrawSelectedItem();
         hideInputBar();
     } else if (e.key == 'Delete') {
         viewport.RemoveSelectedItems();
@@ -237,3 +264,6 @@ async function setupConnection() {
 }
 
 setupConnection();
+
+*/
+export { MainApp };

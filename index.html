@@ -12,26 +12,24 @@
 </head>
 
 <body>
+  <div id="app"></div>
+
+  <script type="module">
+    import {MainApp} from './scripts/main.js'
+    import Van from './scripts/thirdparty/van.js'
+    import jss from './scripts/thirdparty/jss.js'
+    import preset from './scripts/thirdparty/jss-preset-default.js'
+
+    jss.setup(preset());
+    let app = new MainApp();
+    Van.add(document.getElementById('app'), app);
+  </script>
+
+  <!-- 
   <div id="object-viewer">
     <div id="object-detail">
       <div id="object-detail-count"></div>
       <pre><span id="object-detail-text"></span></pre>
-    </div>
-  </div>
-  <div id="object-filter">
-    <div class="object-filter-info">
-      <ol class="object-filter-list"></ol>
-      <input class="object-filter-input" type="text" placeholder="filter rule" />
-      <div class="buttons">
-        <button class="object-filter-add">
-          <i class="fa fa-filter fa-2x"></i>
-        </button>
-        <button class="object-filter-save">
-          <i class="fa fa-save fa-2x"></i>
-        </button>
-        <input type="checkbox" class="object-filter-toggle" />
-      </div>
-      <ol class="layer-filter"></ol>
     </div>
   </div>
   <div class="container">
@@ -119,6 +117,7 @@
   </div>
 
   <script type="module" src="scripts/main.js"></script>
+  -->
 </body>
 
 </html>

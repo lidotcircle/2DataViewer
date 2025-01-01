@@ -1,4 +1,6 @@
 import { Observable, Subject } from './thirdparty/rxjs.js';
+import van from './thirdparty/van.js';
+import jss from './thirdparty/jss.js';
 
 class FilterRule {
     constructor() {
@@ -9,7 +11,7 @@ class FilterRule {
         return true;
     }
 
-    toString() {
+    serialize() {
         return '';
     }
 };
@@ -32,7 +34,7 @@ class KeyValueFilter extends FilterRule {
         return obj[this.m_key] === this.m_value;
     }
 
-    toString(s) {
+    serialize(s) {
         return `${this.enabled || s ? '' : '@'}${this.m_key}=${this.m_value}`;
     }
 };
@@ -55,7 +57,7 @@ class KeyRegexFilter extends FilterRule {
         return this.m_regex.test(obj[this.m_key]);
     }
 
-    toString(s) {
+    serialize(s) {
         return `${this.enabled || s ? '' : '@'}${this.m_key}=/${this.m_regex.source}/`;
     }
 }
@@ -173,47 +175,254 @@ function createFilterRule(str) {
 }
 
 class ObjectFilter {
-    constructor(filterHtmlId) {
+    constructor() {
+        const { classes } = jss.createStyleSheet({
+            objectFilter: {
+                position: "absolute",
+                width: "30%",
+                height: "80%",
+                top: "5%",
+                right: "0em",
+                background: "RGBA(255, 255, 255, 0.5)",
+                "border-radius": "0.2em",
+                "overflow-y": "scroll",
+                "&::-webkit-scrollbar": {
+                    width: "0.3em",
+                    height: "0.3em",
+                    "background-color": "transparent",
+                },
+                "&::-webkit-scrollbar-thumb": {
+                    "background-color": "rgba(180, 180, 180, 0)",
+                    "border-radius": "0.2em",
+                },
+                "&:hover::-webkit-scrollbar-thumb": {
+                    "background-color": "rgba(180, 180, 180, 0.7)",
+                },
+            },
+            objectFilterHide: {
+                display: "none",
+            },
+            objectFilterList: {
+                margin: "0em",
+                padding: "0em",
+                "& li": {
+                    display: "flex",
+                    "flex-flow": "row",
+                    "justify-content": "space-between",
+                    "align-items": "center",
+                    padding: "0.5em",
+                    "border-radius": "0.2em",
+                    "& .controller": {
+                        display: 'grid',
+                        gridTemplateColumns: '2em 2em',
+                        gridColumnGap: '0.5em',
+                        "& button": {
+                            margin: '0.2em 0.2em',
+                            padding: "0.5em",
+                            userSelect: 'none',
+                        },
+                        "& input": {
+                            height: "2em",
+                        }
+                    },
+                },
+            },
+            filterControllers: {
+                width: "100%",
+                display: "flex",
+                "flex-flow": "column",
+            },
+            objectFilterInput: {
+                width: "100%",
+                height: "2em",
+                padding: "0.5em",
+                "border-radius": "0.2em",
+                border: "0em",
+                height: "2em",
+            },
+            layerFilter: {
+                extend: "objectFilterList",
+                "& span": {
+                },
+                "& input": {
+                    width: "2em",
+                },
+                "& .controllerx": {
+                    display: 'grid',
+                    gridTemplateColumns: '2em',
+                    "& input": {
+                        height: "2em",
+                    }
+                }
+            },
+            qbutton: {
+                background: "white",
+                border: "grey",
+                "border-radius": "0.5em",
+                "padding": "0em 1em",
+                "box-shadow": "0.1em 0.1em grey",
+            },
+            buttons: {
+                display: "flex",
+                "flex-flow": "row",
+                "justify-content": "space-between",
+                margin: "0.5em 0em",
+                padding: "0.5em",
+                "& button": {
+                    userSelect: 'none',
+                },
+                "& input": {
+                    width: "max-content",
+                    "min-width": "2em",
+                    height: "2em",
+                },
+            },
+            objectFilterInfo: {
+                "z-index": "999",
+                position: "relative",
+                padding: "0.5em",
+                "border-radius": "0.2em",
+                width: "100%",
+                background: "RGBA(255, 255, 255, 0.5)",
+            },
+        }).attach();
+        this.m_classes = classes;
+        this.m_show = van.state(true);
+        this.m_enabled = van.state(true);
         this.m_filters = [];
-        this.m_rootEl = document.getElementById(filterHtmlId);
-        this.m_ruleListEl = this.m_rootEl.querySelector('.object-filter-list');
-        this.m_inputEl = this.m_rootEl.querySelector('.object-filter-input');
-        this.m_addBtn = this.m_rootEl.querySelector('.object-filter-add');
-        this.m_saveBtn = this.m_rootEl.querySelector('.object-filter-save');
-        this.m_enableCheckbox =
-            this.m_rootEl.querySelector('.object-filter-toggle');
-        this.m_layerFilterEl = this.m_rootEl.querySelector('.layer-filter');
-        this.m_enableCheckbox.checked = true;
+        this.m_filterDDs = van.reactive([]);
+        this.m_filters.push(new KeyRegexFilter("type=/^.*$/"));
+        this.m_filterDDs.push({ str: this.m_filters[0].serialize(), enabled: this.m_filters[0].enabled });
         this.m_layerChangeSubject = new Subject();
         this.m_layerFilter = new LayerFilter();
-
-        this.m_addBtn.addEventListener('click', () => {
-            const filter = createFilterRule(this.m_inputEl.value);
-            if (filter != null) {
-                this.addFilter(filter);
-                this.refreshFilterList();
-                this.saveToLocalStorage();
-                this.m_inputEl.value = '';
-            } else {
-                showError('Invalid filter rule');
-            }
-        });
-        this.m_saveBtn.addEventListener('click', () => {
-            this.saveToLocalStorage();
-        });
-        this.m_enableCheckbox.addEventListener('click', () => {
-            this.m_layerChangeSubject.next();
-        });
-        this.m_inputEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                this.m_addBtn.click();
-            }
-        });
-        this.m_inputEl.addEventListener('keyup', (e) => {
-            e.stopPropagation();
-        });
+        this.m_layerDDs = van.reactive([]);
+        this.syncLayerFromLayerFilter();
 
         this.loadFromLocalStorage();
+    }
+
+    syncLayerFromLayerFilter() {
+        this.m_layerDDs.splice(0);
+        this.m_layerFilter.layerList().forEach(([layer, enabled]) => {
+            this.m_layerDDs.push({ layer, enabled });
+        });
+    }
+
+    renderRuleFilters() {
+        return van.list(
+            van.tags.div({ class: this.m_classes.objectFilterList }),
+            this.m_filterDDs,
+            (filter, _, idx) => {
+                return van.tags.li({},
+                    van.tags.span({}, filter.val.str),
+                    van.tags.span({ class: "controller" },
+                        van.tags.button({
+                            class: this.m_classes.qbutton,
+                            onclick: () => {
+                                this.removeFilter(this.m_filters.at(idx));
+                            }
+                        }, 'X'),
+                        van.tags.input({
+                            type: 'checkbox', checked: filter.val.enabled, onclick: dom => {
+                                const enabled = dom.target.checked;
+                                filter.val.enabled = enabled;
+                                this.m_filters.at(idx).enabled = enabled;
+                                this.m_layerChangeSubject.next();
+                            }
+                        })
+                    ),
+                );
+            });
+    }
+
+    renderRuleFilterControllers() {
+        /** @type {HTMLInputElement} */
+        const filterInput = van.tags.input({
+            class: this.m_classes.objectFilterInput,
+            type: "text",
+            placeholder: "Filter",
+            onkeydown: event => {
+                if (event.key == "Enter") {
+                    try {
+                        const filter = createFilterRule(filterInput.value);
+                        this.addFilter(filter);
+                        filterInput.value = "";
+                    } catch (e) {
+                    }
+                }
+            }
+        });
+        return van.tags.div({ class: this.m_classes.filterControllers }, [
+            van.tags.div({ style: "width: 100%; padding: 0.5em" }, filterInput),
+            van.tags.div({ class: this.m_classes.buttons }, [
+                van.tags.button({
+                    class: this.m_classes.qbutton,
+                    onclick: _ => {
+                        try {
+                            const filter = createFilterRule(filterInput.value);
+                            this.addFilter(filter);
+                            filterInput.value = "";
+                        } catch (e) {
+                        }
+                    }
+                }, "Add"),
+                van.tags.button({
+                    class: this.m_classes.qbutton,
+                    onclick: _ => this.saveToLocalStorage(),
+                }, "Save"),
+                () => van.tags.input({
+                    type: "checkbox",
+                    checked: this.m_enabled.val,
+                    onclick: dom => {
+                        this.m_enabled.val = dom.target.checked;
+                        this.m_layerChangeSubject.next();
+                    }
+                })
+            ])
+        ]);
+    }
+
+    renderLayerFilters() {
+        return van.list(
+            van.tags.div({ class: this.m_classes.layerFilter }),
+            this.m_layerDDs,
+            (layerEX, _, idx) => {
+                const layer = layerEX.val.layer;
+                const enabled = layerEX.val.enabled;
+                return van.tags.li({},
+                    van.tags.span({}, layer),
+                    van.tags.span({ class: "controllerx" },
+                        van.tags.input({
+                            type: 'checkbox', checked: enabled, onclick: dom => {
+                                const enabled = dom.target.checked;
+                                this.m_layerDDs[idx].enabled = enabled;
+                                if (enabled) {
+                                    this.m_layerFilter.showLayer(layer);
+                                } else {
+                                    this.m_layerFilter.hideLayer(layer);
+                                }
+                                this.m_layerChangeSubject.next();
+                            }
+                        })
+                    ),
+                );
+            });
+    }
+
+    /** @param {HTMLElement} dom */
+    render(dom) {
+        if (dom) {
+            if (this.m_show.val != this.m_show._oldVal) {
+                dom.classList.toggle(this.m_classes.objectFilterHide, !this.m_show.val);
+            }
+            return dom;
+        }
+        const hideStatus = this.m_show.val ? '' : ' ' + this.m_classes.objectFilterHide;
+        return van.tags.div({ class: `${this.m_classes.objectFilter + hideStatus}` }, [
+            this.renderRuleFilters.bind(this),
+            this.renderRuleFilterControllers.bind(this),
+            this.renderLayerFilters.bind(this),
+        ]);
     }
 
     get layerChangeObservable() {
@@ -223,79 +432,23 @@ class ObjectFilter {
     }
 
     get enabled() {
-        return this.m_enableCheckbox.checked;
+        return this.m_enabled.rawVal;
     }
 
     addFilter(filter) {
         this.m_filters.push(filter);
-        this.refreshFilterList();
-    }
-
-    refreshFilterList() {
-        while (this.m_ruleListEl.firstChild) {
-            this.m_ruleListEl.removeChild(this.m_ruleListEl.firstChild);
-        }
-
-        for (let filter of this.m_filters) {
-            const li = document.createElement('li');
-            const btn = document.createElement('button');
-            btn.innerText = 'X';
-            btn.addEventListener('click', () => {
-                this.removeFilter(filter);
-                this.refreshFilterList();
-            });
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = filter.enabled;
-            checkbox.addEventListener('click', () => {
-                this.setFilterEnabled(filter, checkbox.checked);
-                this.m_layerChangeSubject.next();
-            });
-            const textEl = document.createElement('span');
-            textEl.innerText = filter.toString(true);
-            li.appendChild(textEl);
-            const ctrls = document.createElement('span');
-            ctrls.appendChild(checkbox);
-            ctrls.appendChild(btn);
-            btn.style.margin = '0.5em 0.25em';
-            btn.style.userSelect = 'none';
-            ctrls.style.display = 'grid';
-            ctrls.style.gridTemplateColumns = '2em 2em';
-            ctrls.style.gridColumnGap = '0.5em';
-            li.appendChild(ctrls);
-            this.m_ruleListEl.appendChild(li);
-        }
-
-        while (this.m_layerFilterEl.firstChild) {
-            this.m_layerFilterEl.removeChild(this.m_layerFilterEl.firstChild);
-        }
-        this.m_layerFilter.layerList().forEach(([layer, enabled]) => {
-            const li = document.createElement('li');
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = enabled;
-            checkbox.addEventListener('click', () => {
-                this.m_layerFilter.toggleLayer(layer);
-                this.m_layerChangeSubject.next();
-            });
-            const textEl = document.createElement('span');
-            textEl.innerText = layer;
-            li.appendChild(textEl);
-            li.appendChild(checkbox);
-            this.m_layerFilterEl.appendChild(li);
-        });
-
-        this.m_layerChangeSubject.next();
+        this.m_filterDDs.push({ str: filter.serialize(), enabled: filter.enabled });
     }
 
     touchLayer(layer) {
         if (this.m_layerFilter.addLayer(layer)) {
-            this.refreshFilterList();
+            this.syncLayerFromLayerFilter();
         }
     }
 
     setFilterEnabled(filter, enabled) {
         filter.enabled = enabled;
+        this.m_filterDDs[this.m_filters.indexOf(filter)].enabled = !!enabled;
         this.m_layerChangeSubject.next();
     }
 
@@ -303,12 +456,12 @@ class ObjectFilter {
         const idx = this.m_filters.indexOf(filter);
         if (idx != -1) {
             this.m_filters.splice(idx, 1);
-            this.refreshFilterList();
+            this.m_filterDDs.splice(idx, 1);
         }
     }
 
     toggleFilterViewer() {
-        this.m_rootEl.classList.toggle('object-filter-show');
+        this.m_show.val = !this.m_show.rawVal;
     }
 
     getRules() {
@@ -316,20 +469,21 @@ class ObjectFilter {
     }
 
     dumpFilter() {
-        return this.m_filters.map(f => f.toString());
+        return this.m_filters.map(f => f.serialize());
     }
 
     loadFilter(strList) {
-        this.m_filters = [];
+        this.m_filters.splice(0);
+        this.m_filterDDs.splice(0);
         for (let str of strList) {
             const filter = createFilterRule(str);
             if (filter != null) {
                 this.m_filters.push(filter);
+                this.m_filterDDs.push({ str: filter.serialize(), enabled: filter.enabled });
             }
         }
-        this.refreshFilterList();
         if (this.m_filters.length > 0) {
-            this.m_rootEl.classList.add('object-filter-show');
+            this.m_show.val = true;
         }
     }
 
@@ -350,9 +504,8 @@ class ObjectFilter {
      */
     setLayerOrder(order) {
         if (this.m_layerFilter.setLayerOrder(order)) {
-            this.refreshFilterList();
+            this.syncLayerFromLayerFilter();
         }
-
     }
 
     isLayerEnabled(layer) {

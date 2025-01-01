@@ -91,11 +91,21 @@ let derive = (f, s = state(), dom) => {
     return s
 }
 
+const renderFunctionName = "render";
 let add = (dom, ...children) => {
     for (let c of children.flat(Infinity)) {
         let protoOfC = protoOf(c ?? 0)
-        let child = protoOfC === stateProto ? bind(() => c.val) :
-            protoOfC === funcProto ? bind(c) : c
+        let child = (() => {
+            if (protoOfC === stateProto) {
+                return bind(() => c.val)
+            } else if (protoOfC === funcProto) {
+                return bind(c);
+            } else if (typeof (c) === 'object' && protoOf(c[renderFunctionName] ?? 0) === funcProto) {
+                return bind(c[renderFunctionName].bind(c));
+            } else {
+                return c;
+            }
+        })();
         child != _undefined && dom.append(child)
     }
     return dom
@@ -196,6 +206,17 @@ const vanx = (() => {
     let stateFields = obj => obj[statesSym]
     let raw = obj => obj[statesSym] ?
         new Proxy(obj[statesSym], { get: (obj, name) => raw(obj[name].rawVal) }) : obj
+    let getRawObject = obj => {
+        if (obj[statesSym]) {
+            let rawObj = {}
+            for (let k of keys(obj[statesSym])) rawObj[k] = getRawObject(obj[statesSym][k])
+            return rawObj
+        } else if (obj.rawVal) {
+            return getRawObject(obj.rawVal);
+        } else {
+            return obj;
+        }
+    };
     let filterBindings = states =>
         states[bindingsSym] = states[bindingsSym].filter(b => b._containerDom.isConnected)
     let addToContainer = (items, k, v, skipReorder, { _containerDom, f }) => {
@@ -262,7 +283,7 @@ const vanx = (() => {
     }
     let compact = obj => Array.isArray(obj) ? obj.filter(_ => 1).map(compact) :
         isObject(obj) ? fromEntries(entries(obj).map(([k, v]) => [k, compact(v)])) : obj
-    return { calc, reactive, noreactive, stateFields, raw, list, replace, compact };
+    return { calc, reactive, noreactive, stateFields, raw, list, replace, compact, getRawObject };
 })();
 
 export default {
