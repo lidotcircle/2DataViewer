@@ -443,6 +443,7 @@ class ObjectFilter {
     addFilter(filter) {
         this.m_filters.push(filter);
         this.m_filterDDs.push({ str: filter.serialize(), enabled: filter.enabled });
+        this.m_layerChangeSubject.next();
     }
 
     touchLayer(layer) {
@@ -462,6 +463,7 @@ class ObjectFilter {
         if (idx != -1) {
             this.m_filters.splice(idx, 1);
             this.m_filterDDs.splice(idx, 1);
+            this.m_layerChangeSubject.next();
         }
     }
 
@@ -474,13 +476,20 @@ class ObjectFilter {
     }
 
     dumpFilter() {
-        return this.m_filters.map(f => f.serialize());
+        return {
+            enabled: this.m_enabled.rawVal,
+            filters: this.m_filters.map(f => f.serialize()),
+        };
     }
 
-    loadFilter(strList) {
+    loadFilter(obj) {
+        const { enabled, filters } = obj;
+        if (enabled != null) {
+            this.m_enabled.val = enabled;
+        }
         this.m_filters.splice(0);
         this.m_filterDDs.splice(0);
-        for (let str of strList) {
+        for (let str of filters || []) {
             const filter = createFilterRule(str);
             if (filter != null) {
                 this.m_filters.push(filter);

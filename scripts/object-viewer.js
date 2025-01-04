@@ -43,7 +43,7 @@ class ObjectViewer {
 
             },
             objectViewerItem: {
-                "padding": "10px",
+                "padding": "0em 0.5em",
             },
         }).attach();
         this.m_classes = classes;
@@ -69,7 +69,7 @@ class ObjectViewer {
             o => {
                 return van.tags.li(
                     { class: `${this.m_classes.objectViewerItem}` },
-                    JSON.stringify(van.getRawObject(o)));
+                    van.tags.pre({ style: "margin: 0em" }, JSON.stringify(van.getRawObject(o), null, 2)));
             }));
     }
 }

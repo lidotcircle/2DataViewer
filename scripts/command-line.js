@@ -1,3 +1,4 @@
+import { DrawItem } from './draw-item.js';
 import { ObjectManager } from './object-manager.js';
 import { Viewport } from './viewport.js';
 

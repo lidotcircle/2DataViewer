@@ -75,6 +75,10 @@ class Application {
         /** @private */
         this.m_frameLoader = new MultiFrameSource();
 
+        this.m_frameLoader.nextFrameObservable.subscribe((drawItems) => {
+            this.SetDrawingObjects(drawItems);
+        });
+
         const { classes } = jss.createStyleSheet({
             container: {
                 display: 'flex',
@@ -227,6 +231,10 @@ class Application {
 
     get AppEvents() {
         return this.m_appEvents;
+    }
+
+    get ObjectManager() {
+        return this.m_objectManager;
     }
 
     /**

@@ -6,12 +6,7 @@ import jss from './thirdparty/jss.js';
 
 
 class MultiFrameSource {
-    /**
-     * @param {BoundingBox} box
-     * @param {function(number): Promise<string>} loader
-     * @param {number} totalFrames
-     */
-    constructor(box, loader, totalFrames) {
+    constructor() {
         const { classes } = jss.createStyleSheet({
             "controls": {
                 background: "#333",
@@ -62,15 +57,17 @@ class MultiFrameSource {
         this.m_classes = classes;
 
         /** @private */
-        this.m_box = box;
+        this.m_box = null;
         /** @private */
-        this.m_loader = loader;
+        this.m_loader = null;
         /** @private */
         this.m_paused = Van.state(true);
         /** @private */
-        this.m_currentFrame = 0;
+        this.m_currentFrame = Van.state(0);
         /** @private */
-        this.m_totalFrames = totalFrames;
+        this.m_framePerSecond = 1;
+        /** @private */
+        this.m_totalFrames = Van.state(0);
         /** @private */
         this.m_show = Van.state(true);
 
@@ -78,26 +75,64 @@ class MultiFrameSource {
         this.m_frameCountSubject = new Subject();
         /** @private */
         this.m_nextFrameSubject = new Subject();
+
+        this.setupConnection();
+    }
+
+    /** @private */
+    async setupConnection() {
+        const INFOAPI = location.protocol + '//' + location.host + '/data-info';
+        const resp = await fetch(INFOAPI);
+        const data = await resp.json();
+        let box = null;
+        let nframes = 0;
+        if (data['minxy']) {
+            box = new BoundingBox(data['minxy'], data['maxxy']);
+            nframes = data['nframes'];
+        }
+
+        this.m_box = box;
+        this.m_totalFrames.val = nframes;
+        this.m_loader = async (n) => {
+            const API = `${location.protocol}//${location.host}/frame/${n}`;
+            const resp = await fetch(API);
+            const data = await resp.json();
+            return JSON.stringify(data['drawings'] || []);
+        };
+
+        this.GotoFrame(0);
     }
 
     async LoopTillEnd() {
+        if (this.m_inLoop) {
+            return;
+        }
+        this.m_inLoop = true;
         this.m_paused.val = false;
-        while (!this.m_paused.rawVal) {
-            await this.GotoFrame(this.m_currentFrame);
-            this.m_currentFrame++;
-            if (this.m_currentFrame >= this.m_totalFrames - 1) {
-                this.m_paused.val = true;
+        try {
+            while (!this.m_paused.rawVal) {
+                if (this.m_currentFrame.rawVal + 1 < this.m_totalFrames.rawVal) {
+                    await this.GotoFrame(this.m_currentFrame.rawVal + 1);
+                    this.m_currentFrame.val++;
+                } else {
+                    this.m_paused.val = true;
+                }
             }
+        } finally {
+            this.m_inLoop = false;
         }
     }
 
     /** @public */
     async GotoFrame(n) {
-        if (n > this.m_totalFrames - 1) return;
+        if (n > this.m_totalFrames.rawVal - 1) return;
 
         const objectList = [];
-        this.m_currentFrame = Math.max(Math.min(n, this.m_totalFrames - 1), 0);
-        const text = await this.m_loader(this.m_currentFrame);
+        const nn = Math.max(Math.min(n, this.m_totalFrames.rawVal - 1), 0);
+        if (nn != this.m_currentFrame.rawVal) {
+            this.m_currentFrame.val = nn;
+        }
+        const text = await this.m_loader(this.m_currentFrame.rawVal);
         const objlist = JSON.parse(text);
         for (let obj of objlist) {
             const drawItem = new DrawItem(obj.type)
@@ -110,12 +145,12 @@ class MultiFrameSource {
 
     /** @public */
     get CurrentFrame() {
-        return this.m_currentFrame;
+        return this.m_currentFrame.rawVal;
     }
 
     /** @public */
     get TotalFrames() {
-        return this.m_totalFrames;
+        return this.m_totalFrames.rawVal;
     }
 
     /**
@@ -156,7 +191,12 @@ class MultiFrameSource {
                 return Van.tags.button(
                     {
                         style: "position: relative",
-                        onclick: () => this.m_paused.val = !this.m_paused.rawVal
+                        onclick: () => {
+                            this.m_paused.val = !this.m_paused.rawVal;
+                            if (!this.m_paused.rawVal) {
+                                this.LoopTillEnd();
+                            }
+                        },
                     },
                     Van.tags.i({ class: "fa fa-play fa-2x", style: `position: absolute; visibility: ${playVisibility}` }),
                     Van.tags.i({ class: "fa fa-pause fa-2x", style: `visibility: ${pauseVisibility}` })
@@ -166,10 +206,40 @@ class MultiFrameSource {
                 { onclick: () => { this.m_paused.val = true; this.GotoFrame(0); } },
                 Van.tags.i({ class: "fa fa-stop fa-2x" })
             ),
-            () => Van.tags.input({ class: this.m_classes.framePerSecond, type: "number", value: "1", min: "1", max: "60", step: "1" }),
-            () => Van.tags.input({ class: this.m_classes.currentFrame, type: "number", value: "1", min: "1", max: `${this.m_totalFrames - 1}`, step: "1" }),
-            () => Van.tags.input({ class: "progress", type: "range", value: "0", min: "0", max: "100", step: "0.1" }),
-            () => Van.tags.span({ class: this.m_classes.timestamp }, `0/${this.m_totalFrames - 1}`)
+            () => {
+                const ipt = Van.tags.input({
+                    class: this.m_classes.framePerSecond,
+                    type: "number",
+                    value: this.m_framePerSecond,
+                    min: "1",
+                    max: "60",
+                    step: "1",
+                    oninput: event => this.m_framePerSecond = event.target.valueAsNumber,
+                });
+                return ipt;
+            },
+            () => Van.tags.input({
+                class: this.m_classes.currentFrame,
+                type: "number",
+                value: this.m_currentFrame.val + 1,
+                step: "1",
+                min: "1",
+                max: `${this.m_totalFrames.val}`,
+            }),
+            () => Van.tags.input({
+                class: "progress",
+                type: "range",
+                value: this.m_currentFrame.val + 1,
+                min: this.m_totalFrames.val > 0 ? 1 : 0,
+                max: this.m_totalFrames.val,
+                step: "1",
+                oninput: event => {
+                    if (this.m_totalFrames.rawVal > 0) {
+                        this.m_currentFrame.val = event.target.valueAsNumber - 1;
+                    }
+                }
+            }),
+            () => Van.tags.span({ class: this.m_classes.timestamp }, `${this.m_currentFrame.val + 1}/${this.m_totalFrames.val}`)
         );
     }
 };
