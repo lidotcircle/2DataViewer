@@ -11,7 +11,8 @@ class CursorBox {
                 width: '100%',
                 height: '100%',
                 position: 'absolute',
-                top: '0em'
+                top: '0em',
+                cursor: "crosshair",
             })
         });
         /** @private */

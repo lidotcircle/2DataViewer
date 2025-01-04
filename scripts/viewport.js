@@ -772,19 +772,17 @@ class Viewport {
     FitScreen() {
         let box = null;
         for (const layerInfo of this.m_layerList) {
-            if (!this.m_objectFilter.isLayerEnabled(layerInfo.layerName)) {
+            if (!layerInfo.visible) {
                 continue;
             }
 
-            for (const obj of layerInfo.objectList) {
-                if (this.m_objectFilter.match(obj)) {
-                    const kbox = obj.getBox();
-                    if (box == null) {
-                        box = kbox;
-                    } else {
-                        if (kbox) {
-                            box = box.mergeBox(kbox);
-                        }
+            for (const obj of layerInfo.drawedItems) {
+                const kbox = obj.getBox();
+                if (box == null) {
+                    box = kbox;
+                } else {
+                    if (kbox) {
+                        box = box.mergeBox(kbox);
                     }
                 }
             }
@@ -847,8 +845,8 @@ class Viewport {
             Y = X.y;
             X = X.x;
         }
-        X = X || 0;
-        Y = Y || 0;
+        X = X || this.viewportCenter.x;
+        Y = Y || this.viewportCenter.y;
         this.rotateAtToViewport(clockwiseDegree, X, Y);
     }
 

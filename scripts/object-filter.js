@@ -179,13 +179,12 @@ class ObjectFilter {
         const { classes } = jss.createStyleSheet({
             objectFilter: {
                 position: "absolute",
-                width: "30%",
-                height: "80%",
+                "max-width": "30%",
+                "max-height": "80%",
                 top: "5%",
                 right: "0em",
-                background: "RGBA(255, 255, 255, 0.5)",
-                "border-radius": "0.2em",
                 "overflow-y": "scroll",
+                "z-index": 1,
                 "&::-webkit-scrollbar": {
                     width: "0.3em",
                     height: "0.3em",
@@ -198,6 +197,11 @@ class ObjectFilter {
                 "&:hover::-webkit-scrollbar-thumb": {
                     "background-color": "rgba(180, 180, 180, 0.7)",
                 },
+            },
+            objectFilterContent: {
+                width: "max-content",
+                background: "RGBA(255, 255, 255, 0.5)",
+                "border-radius": "0.2em",
             },
             objectFilterHide: {
                 display: "none",
@@ -261,6 +265,7 @@ class ObjectFilter {
                 "border-radius": "0.5em",
                 "padding": "0em 1em",
                 "box-shadow": "0.1em 0.1em grey",
+                cursor: "pointer",
             },
             buttons: {
                 display: "flex",
@@ -388,12 +393,11 @@ class ObjectFilter {
             this.m_layerDDs,
             (layerEX, _, idx) => {
                 const layer = layerEX.val.layer;
-                const enabled = layerEX.val.enabled;
                 return van.tags.li({},
                     van.tags.span({}, layer),
                     van.tags.span({ class: "controllerx" },
-                        van.tags.input({
-                            type: 'checkbox', checked: enabled, onclick: dom => {
+                        () => van.tags.input({
+                            type: 'checkbox', checked: layerEX.val.enabled, onclick: dom => {
                                 const enabled = dom.target.checked;
                                 this.m_layerDDs[idx].enabled = enabled;
                                 if (enabled) {
@@ -418,11 +422,12 @@ class ObjectFilter {
             return dom;
         }
         const hideStatus = this.m_show.val ? '' : ' ' + this.m_classes.objectFilterHide;
-        return van.tags.div({ class: `${this.m_classes.objectFilter + hideStatus}` }, [
-            this.renderRuleFilters.bind(this),
-            this.renderRuleFilterControllers.bind(this),
-            this.renderLayerFilters.bind(this),
-        ]);
+        return van.tags.div({ class: `${this.m_classes.objectFilter + hideStatus}` },
+            van.tags.div({ class: this.m_classes.objectFilterContent }, [
+                this.renderRuleFilters.bind(this),
+                this.renderRuleFilterControllers.bind(this),
+                this.renderLayerFilters.bind(this),
+            ]));
     }
 
     get layerChangeObservable() {

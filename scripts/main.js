@@ -5,6 +5,7 @@ import { MultiFrameSource } from './multi-frame-source.js';
 import { KeyRegexFilter, ObjectFilter } from './object-filter.js';
 import { ObjectViewer } from './object-viewer.js';
 import van from './thirdparty/van.js';
+import jss from './thirdparty/jss.js';
 
 
 function showError(msg) {
@@ -18,18 +19,24 @@ class MainApp {
         this.m_selectedObjects = van.reactive([]);
         this.m_objectViewer = new ObjectViewer(this.m_selectedObjects);
         setInterval(() => {
-            // this.m_objectViewer.toggle();
             this.m_selectedObjects.push({ x: Math.random(), y: Math.random() });
         }, 1000);
-        this.m_objectFilter = new ObjectFilter('object-filter');
-        this.m_objectFilter.addFilter(new KeyRegexFilter("layer", "layer1"));
+        this.m_application = new Application();
+        const {classes} = jss.createStyleSheet({
+            container: {
+                display: 'flex',
+                flexDirection: 'column',
+                width: '100%',
+                height: '100%',
+            }
+        }).attach();
+        this.m_classes = classes;
     }
 
-    /** @param {HTMLElement} dom */
-    render(dom) {
-        return van.tags.div({ class: 'container' }, [
+    render() {
+        return van.tags.div({ class: this.m_classes.container }, [
             this.m_objectViewer,
-            this.m_objectFilter,
+            this.m_application,
         ]);
     }
 }

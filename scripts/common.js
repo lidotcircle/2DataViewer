@@ -196,6 +196,12 @@ class BoundingBox {
     }
 }
 
+function text2htmlElement(text) {
+    const div = document.createElement('div');
+    div.innerHTML = text;
+    return div.firstElementChild;
+}
+
 function Box2boxTransformation(box1, box2) {
     const s = Math.min(
         box2.getHeight() / box1.getHeight(), box2.getWidth() / box1.getWidth());
@@ -435,6 +441,7 @@ export {
     AffineTransformation,
     BoundingBox,
     Box2boxTransformation,
+    text2htmlElement,
     PointSub,
     PointAdd,
     VecResize,

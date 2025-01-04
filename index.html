@@ -12,7 +12,7 @@
 </head>
 
 <body>
-  <div id="app"></div>
+  <div id="app" style="width: 100%; height: 100%"></div>
 
   <script type="module">
     import {MainApp} from './scripts/main.js'
@@ -26,93 +26,13 @@
   </script>
 
   <!-- 
-  <div id="object-viewer">
-    <div id="object-detail">
-      <div id="object-detail-count"></div>
-      <pre><span id="object-detail-text"></span></pre>
-    </div>
-  </div>
   <div class="container">
-    <div class="title">
-      <h1>2D Data Viewer</h1>
-    </div>
-    <div class="screen" id="fullviewport" tabindex="-1">
-      <div id="viewport"></div>
-      <div class="cursor-box"></div>
-    </div>
     <div class="tools">
       <div id="input-bar">
         <input id="command-line-input" type="text" autocomplete="off" />
       </div>
       <span id="error-bar"></span>
-      <button class="btn" id="fit-screen">
-        <i class="fa fa-arrows-alt fa-2x"></i>
-      </button>
-      <button class="btn" id="reset">
-        <i class="fa fa-crosshairs fa-2x"></i>
-      </button>
-      <button class="btn" id="scale-up">
-        <i class="fa fa-plus-circle fa-2x"></i>
-      </button>
-      <button class="btn" id="scale-down">
-        <i class="fa fa-minus-circle fa-2x"></i>
-      </button>
-      <button class="btn" id="mirror-xaxis">
-        <svg width="2em" height="2em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-          style="background: white; border-raidus: 0.5em; transform: translate(0, 0.1em);">
-          <path
-            d="M3 12C3 16.2426 3 18.364 4.31802 19.682C5.63604 21 7.75736 21 12 21M12 3C7.75736 3 5.63604 3 4.31802 4.31802C3.50241 5.13363 3.19151 6.25685 3.073 8"
-            stroke="black" stroke-width="2.5" stroke-linecap="round" />
-          <path
-            d="M11 21H15C17.8284 21 19.2426 21 20.1213 20.1213C21 19.2426 21 17.8284 21 15V9C21 6.17157 21 4.75736 20.1213 3.87868C19.2426 3 17.8284 3 15 3H11"
-            stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="2.5 3" />
-          <path d="M12 22L12 2" stroke="black" stroke-width="2.5" stroke-linecap="round" />
-        </svg>
-      </button>
-      <button class="btn" id="mirror-yaxis">
-        <svg width="2em" height="2em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-          style="background: white; border-raidus: 0.5em; transform: matrix(0, 1, 1, 0, 0, 2);">
-          <path
-            d="M3 12C3 16.2426 3 18.364 4.31802 19.682C5.63604 21 7.75736 21 12 21M12 3C7.75736 3 5.63604 3 4.31802 4.31802C3.50241 5.13363 3.19151 6.25685 3.073 8"
-            stroke="black" stroke-width="2.5" stroke-linecap="round" />
-          <path
-            d="M11 21H15C17.8284 21 19.2426 21 20.1213 20.1213C21 19.2426 21 17.8284 21 15V9C21 6.17157 21 4.75736 20.1213 3.87868C19.2426 3 17.8284 3 15 3H11"
-            stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="2.5 3" />
-          <path d="M12 22L12 2" stroke="black" stroke-width="2.5" stroke-linecap="round" />
-        </svg>
-      </button>
-      <button class="btn" id="rotate-ccw-at-origin">
-        <i class="fa fa-rotate-left fa-2x"></i>
-      </button>
-      <button class="btn" id="rotate-cw-at-origin">
-        <i class="fa fa-rotate-right fa-2x"></i>
-      </button>
-      <button class="btn" id="move-left">
-        <i class="fa fa-arrow-circle-left fa-2x"></i>
-      </button>
-      <button class="btn" id="move-right">
-        <i class="fa fa-arrow-circle-right fa-2x"></i>
-      </button>
-      <button class="btn" id="move-up">
-        <i class="fa fa-arrow-circle-up fa-2x"></i>
-      </button>
-      <button class="btn" id="move-down">
-        <i class="fa fa-arrow-circle-down fa-2x"></i>
-      </button>
       <span class="coordx"><span id="cursor-coordination">(0,0)</span></span>
-    </div>
-    <div class="controls">
-      <button class="btn" id="play">
-        <i class="fa fa-play fa-2x"></i>
-        <i class="fa fa-pause fa-2x"></i>
-      </button>
-      <button class="btn" id="stop">
-        <i class="fa fa-stop fa-2x"></i>
-      </button>
-      <input id="frame-per-second" type="number" value="1" min="1" max="60" />
-      <input id="current-frame" type="number" value="1" min="1" />
-      <input type="range" id="progress" class="progress" min="0" max="100" step="0.1" value="0" />
-      <span class="timestamp" id="timestamp">0/0</span>
     </div>
   </div>
 

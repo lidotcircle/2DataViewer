@@ -8,8 +8,8 @@ class ObjectViewer {
         const { classes } = jss.createStyleSheet({
             objectViewerContainer: {
                 position: "absolute",
-                width: "30%",
-                height: "80%",
+                "max-width": "30%",
+                "max-height": "80%",
                 top: "5%",
                 left: "5%",
                 "overflow-y": "scroll",
