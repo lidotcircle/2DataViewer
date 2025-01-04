@@ -1,10 +1,12 @@
 import van from "./thirdparty/van.js";
 import jss from "./thirdparty/jss.js";
+import { genStyle } from "./common.js";
 
 
 class ObjectViewer {
-    constructor(objects) {
-        this.m_objects = objects;
+    constructor() {
+        this.m_objects = van.reactive([]);
+        this.m_objectCount = van.state(0);
         const { classes } = jss.createStyleSheet({
             objectViewerContainer: {
                 position: "absolute",
@@ -50,6 +52,20 @@ class ObjectViewer {
         this.m_show = van.state(true);
     }
 
+    showObjects(objs) {
+        this.m_objects.splice(0);
+        for (const obj of objs) {
+            const xobj = {};
+            Object.getOwnPropertyNames(obj).forEach((key) => {
+                if (key != "m_shape") {
+                    xobj[key] = obj[key];
+                }
+            })
+            this.m_objects.push(van.noreactive(xobj));
+        }
+        this.m_objectCount.val = this.m_objects.length;
+    }
+
     toggle() {
         this.m_show.val = !this.m_show.val;
     }
@@ -64,7 +80,16 @@ class ObjectViewer {
         }
         const hideClass = this.m_show.val ? '' : " " + this.m_classes.objectViewerHide;
         return van.tags.div({ class: `${this.m_classes.objectViewerContainer}${hideClass}` }, van.list(
-            van.tags.ul({ class: `${this.m_classes.objectViewerList}` }),
+            van.tags.ul(
+                { class: `${this.m_classes.objectViewerList}` },
+                () => van.tags.div(
+                    {
+                        style: genStyle({
+                            padding: "1em 0.5em",
+                        }),
+                    },
+                    `${this.m_objectCount.val} objects selected`),
+            ),
             this.m_objects || [],
             o => {
                 return van.tags.li(

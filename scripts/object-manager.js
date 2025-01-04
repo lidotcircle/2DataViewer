@@ -291,6 +291,12 @@ class ObjectManager {
         }
     }
 
+    removeDrawingObjects(objs) {
+        for (const obj of objs) {
+            this.removeDrawingObject(obj);
+        }
+    }
+
     clear() {
         for (let layer of this.m_layers) {
             layer.clear();

@@ -237,6 +237,14 @@ class Application {
         return this.m_objectManager;
     }
 
+    get ObjectFilter() {
+        return this.m_objectFilter;
+    }
+
+    get FrameLoader() {
+        return this.m_frameLoader;
+    }
+
     /**
      * @return {Observable<{x: number, y: number}>}
      * @public

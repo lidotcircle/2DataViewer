@@ -2,26 +2,16 @@ import { Application } from './application.js';
 import { ObjectViewer } from './object-viewer.js';
 import van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
+import { SetupShortcuts } from './shortcuts.js';
 
 
 class MainApp {
     constructor() {
-        this.m_selectedObjects = van.reactive([]);
-        this.m_objectViewer = new ObjectViewer(this.m_selectedObjects);
-
+        this.m_objectViewer = new ObjectViewer();
         this.m_application = new Application();
-        this.m_application.ObjectManager.selectedObjectsObservable.subscribe((objs) => {
-            this.m_selectedObjects.splice(0);
-            for (const obj of objs) {
-                const xobj = {};
-                Object.getOwnPropertyNames(obj).forEach((key) => {
-                    if (key != "m_shape") {
-                        xobj[key] = obj[key];
-                    }
-                })
-                this.m_selectedObjects.push(van.noreactive(xobj));
-            }
-        });
+        this.m_application.ObjectManager
+            .selectedObjectsObservable
+            .subscribe((objs) => this.m_objectViewer.showObjects(objs));
         const { classes } = jss.createStyleSheet({
             container: {
                 display: 'flex',
@@ -31,6 +21,8 @@ class MainApp {
             }
         }).attach();
         this.m_classes = classes;
+
+        SetupShortcuts(this.m_application, this.m_objectViewer);
     }
 
     render() {

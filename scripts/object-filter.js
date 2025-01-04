@@ -1,6 +1,7 @@
 import { Observable, Subject } from './thirdparty/rxjs.js';
 import van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
+import { genStyle } from './common.js';
 
 class FilterRule {
     constructor() {
@@ -14,6 +15,8 @@ class FilterRule {
     serialize() {
         return '';
     }
+
+    tostring() { return this.serialize(); }
 };
 
 class KeyValueFilter extends FilterRule {
@@ -21,10 +24,6 @@ class KeyValueFilter extends FilterRule {
         super();
         this.m_key = key;
         this.m_value = value;
-        if (this.m_key.startsWith('@')) {
-            this.m_key = this.m_key.substr(1);
-            this.enabled = false;
-        }
     }
 
     match(obj) {
@@ -34,8 +33,12 @@ class KeyValueFilter extends FilterRule {
         return obj[this.m_key] === this.m_value;
     }
 
-    serialize(s) {
-        return `${this.enabled || s ? '' : '@'}${this.m_key}=${this.m_value}`;
+    serialize() {
+        return JSON.stringify({ key: this.m_key, value: this.m_value, enabled: this.enabled, type: 'keyValue' });
+    }
+
+    tostring() {
+        return `${this.m_key}=${this.m_value}`;
     }
 };
 
@@ -43,11 +46,8 @@ class KeyRegexFilter extends FilterRule {
     constructor(key, regex) {
         super();
         this.m_key = key;
+        this.m_regexStr = regex;
         this.m_regex = new RegExp(regex);
-        if (this.m_key.startsWith('@')) {
-            this.m_key = this.m_key.substr(1);
-            this.enabled = false;
-        }
     }
 
     match(obj) {
@@ -57,8 +57,13 @@ class KeyRegexFilter extends FilterRule {
         return this.m_regex.test(obj[this.m_key]);
     }
 
-    serialize(s) {
-        return `${this.enabled || s ? '' : '@'}${this.m_key}=/${this.m_regex.source}/`;
+    serialize() {
+        return JSON.stringify({ key: this.m_key, regex: this.m_regexStr, enabled: this.enabled, type: 'regex' });
+    }
+
+    tostring() {
+
+        return `${this.m_key}=/${this.m_regexStr}/`;
     }
 }
 
@@ -172,6 +177,24 @@ function createFilterRule(str) {
         return new KeyRegexFilter(kv[0], kv[1].substr(1, kv[1].length - 2));
     }
     return new KeyValueFilter(kv[0], kv[1]);
+}
+
+function deserializeFilterRule(str) {
+    const obj = JSON.parse(str);
+    const filter = (() => {
+        switch (obj.type) {
+            case 'keyValue':
+                return new KeyValueFilter(obj.key, obj.value);
+            case 'regex':
+                return new KeyRegexFilter(obj.key, obj.regex);
+            default:
+                return null;
+        }
+    })();
+    if (filter != null) {
+        filter.enabled = obj.enabled;
+    }
+    return filter;
 }
 
 class ObjectFilter {
@@ -296,8 +319,6 @@ class ObjectFilter {
         this.m_enabled = van.state(true);
         this.m_filters = [];
         this.m_filterDDs = van.reactive([]);
-        this.m_filters.push(new KeyRegexFilter("type=/^.*$/"));
-        this.m_filterDDs.push({ str: this.m_filters[0].serialize(), enabled: this.m_filters[0].enabled });
         this.m_layerChangeSubject = new Subject();
         this.m_layerFilter = new LayerFilter();
         this.m_layerDDs = van.reactive([]);
@@ -383,7 +404,7 @@ class ObjectFilter {
                         this.m_layerChangeSubject.next();
                     }
                 })
-            ])
+            ]),
         ]);
     }
 
@@ -421,12 +442,21 @@ class ObjectFilter {
             }
             return dom;
         }
+        const sep = () => van.tags.div({
+            style: genStyle({
+                width: '100%',
+                height: '5px',
+                background: 'RGBA(55, 55, 55, 0.8)',
+                margin: '0.5em 0em',
+            })
+        });
         const hideStatus = this.m_show.val ? '' : ' ' + this.m_classes.objectFilterHide;
         return van.tags.div({ class: `${this.m_classes.objectFilter + hideStatus}` },
             van.tags.div({ class: this.m_classes.objectFilterContent }, [
+                this.renderLayerFilters.bind(this),
+                sep(),
                 this.renderRuleFilters.bind(this),
                 this.renderRuleFilterControllers.bind(this),
-                this.renderLayerFilters.bind(this),
             ]));
     }
 
@@ -442,7 +472,7 @@ class ObjectFilter {
 
     addFilter(filter) {
         this.m_filters.push(filter);
-        this.m_filterDDs.push({ str: filter.serialize(), enabled: filter.enabled });
+        this.m_filterDDs.push({ str: filter.tostring(), enabled: filter.enabled });
         this.m_layerChangeSubject.next();
     }
 
@@ -490,10 +520,10 @@ class ObjectFilter {
         this.m_filters.splice(0);
         this.m_filterDDs.splice(0);
         for (let str of filters || []) {
-            const filter = createFilterRule(str);
+            const filter = deserializeFilterRule(str);
             if (filter != null) {
                 this.m_filters.push(filter);
-                this.m_filterDDs.push({ str: filter.serialize(), enabled: filter.enabled });
+                this.m_filterDDs.push({ str: filter.tostring(), enabled: filter.enabled });
             }
         }
         if (this.m_filters.length > 0) {
