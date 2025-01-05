@@ -1,5 +1,5 @@
 import { BoundingBox, PointAdd, PointSub } from './common.js';
-import { Circle, Point, Polygon, Segment } from './thirdparty/flatten.js';
+import { Arc, Circle, Point, Polygon, Segment } from './thirdparty/flatten.js';
 import { DrawTextInCanvasAcrossLine } from './canvas-utils.js';
 
 
@@ -45,6 +45,37 @@ class DrawItem {
         ans.points = points;
         return ans;
     }
+    static CreateCompound(shapes) {
+        let ans = new DrawItem('compound');
+        const xshapes = [];
+        for (let shape of shapes) {
+            const s = new DrawItem(shape.type);
+            for (const key in Object.getOwnPropertyNames(shape)) {
+                s[key] = shape[key];
+            }
+            xshapes.push(s);
+        }
+        ans.shapes = xshapes;
+        return ans;
+    }
+    static CreateArc(center, radius, startAngle, endAngle, isCounterClockwise) {
+        let ans = new DrawItem('arc');
+        ans.center = center;
+        ans.radius = radius;
+        ans.startAngle = startAngle;
+        ans.endAngle = endAngle;
+        ans.isCounterClockwise = isCounterClockwise;
+        return ans;
+    }
+
+    static recursivelySanitize(item) {
+        if (item.type == 'compound') {
+            for (let shape of item.shapes) {
+                DrawItem.recursivelySanitize(shape);
+            }
+        }
+        Object.setPrototypeOf(item, DrawItem.prototype);
+    }
 
     constructor(type) {
         this.type = type;
@@ -76,6 +107,22 @@ class DrawItem {
                 }
             }
             return box;
+        } else if (this.type == 'compound') {
+            let box = null;
+            for (let shape of this.shapes) {
+                if (box == null) {
+                    box = shape.getBox();
+                } else {
+                    box = box.mergeBox(shape.getBox());
+                }
+            }
+            return box;
+        } else if (this.type == 'arc') {
+            // TODO
+            const r = this.radius;
+            const c = this.center;
+            return new BoundingBox(
+                PointSub(c, { x: r, y: r }), PointAdd(c, { x: r, y: r }));
         } else {
             return null;
         }
@@ -101,6 +148,15 @@ class DrawItem {
                 break;
             case 'polygon':
                 this.m_shape = new Polygon(this.points);
+                break;
+            case 'compound':
+                // TODO
+                this.m_shape = this.shapes[0].shape();
+                break;
+            case 'arc':
+                this.m_shape = new Arc(
+                    toPoint(this.center), this.radius, this.startAngle,
+                    this.endAngle, this.isCounterClockwise);
                 break;
             default:
                 this.m_shape = null;
@@ -219,6 +275,26 @@ class DrawItem {
                         PointAdd(center, { x: radius * 0.6, y: 0 }), radius * 1.2,
                         item.comment, 0.95, false);
                 }
+            }
+        } else if (item.type == 'compound') {
+            for (const s of item.shapes) {
+                s.rendering(ctx);
+            }
+        } else if (item.type == 'arc') {
+            ctx.fillStyle = item.color;
+            ctx.strokeStyle = item.color;
+            ctx.lineWidth = item.width || 1;
+            const path = new Path2D();
+            const startRad = item.startAngle * Math.PI / 180;
+            const endRad = item.endAngle * Math.PI / 180;
+            path.arc(item.center.x, item.center.y, item.radius, startRad, endRad, item.isCounterClockwise);
+            ctx.stroke(path);
+            if (item.comment) {
+                ctx.fillStyle = 'white';
+                DrawTextInCanvasAcrossLine(
+                    ctx, PointSub(item.center, { x: item.radius * 0.6, y: 0 }),
+                    PointAdd(item.center, { x: item.radius * 0.6, y: 0 }),
+                    item.radius * 1.2, item.comment, 0.95, false);
             }
         }
     }

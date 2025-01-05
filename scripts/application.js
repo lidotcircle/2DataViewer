@@ -133,12 +133,28 @@ class Application {
                 "align-items": "center",
                 padding: "10px",
                 position: "relative",
+                "overflow-x": "scroll",
+                "overflow-y": "hidden",
+                "&::-webkit-scrollbar": {
+                    width: "0.3em",
+                    height: "0.3em",
+                    "background-color": "transparent"
+                },
+                "&::-webkit-scrollbar-thumb": {
+                    "background-color": "rgba(180, 180, 180, 0)",
+                    "border-radius": "0.2em",
+                },
+                "&:hover": {
+                    "&::-webkit-scrollbar-thumb": {
+                        "background-color": "rgba(180, 180, 180, 0.7)",
+                    }
+                },
                 "& button": {
                     border: 0,
                     background: "transparent",
                     cursor: "pointer",
                     color: "white",
-                }
+                },
             },
         }).attach();
         this.m_classes = classes;

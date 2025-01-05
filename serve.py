@@ -18,8 +18,14 @@ def tokenize(input_string):
         tokens.extend(re.findall(token_pattern, line))
     return tokens
 
+
 def parse_tokens(tokens):
     tokenIdx = 0
+    supported_shapes = [
+        "circle", "line", "cline",
+        "polygon", "compound", "arc"
+    ]
+
     def next_token():
         nonlocal tokenIdx
         if tokenIdx >= len(tokens):
@@ -27,6 +33,11 @@ def parse_tokens(tokens):
         idx = tokenIdx
         tokenIdx += 1
         return tokens[idx]
+
+    def move_backward():
+        nonlocal tokenIdx
+        assert tokenIdx > 0
+        tokenIdx -= 1
 
     def token_at(idx):
         idx += tokenIdx
@@ -39,6 +50,15 @@ def parse_tokens(tokens):
 
     def parse_shape():
         shape = {"type": next_token()}
+        if shape["type"] == "compound":
+            shape["shapes"] = []
+            while top_token() and top_token() == '(':
+                next_token()  # Consume opening '('
+                if top_token() and top_token() not in supported_shapes:
+                    move_backward()
+                    break
+                shape["shapes"].append(parse_shape())
+
         while top_token() and top_token() != ')':
             if top_token() == '(':
                 next_token()  # Consume '('
@@ -49,8 +69,11 @@ def parse_tokens(tokens):
                     x = float(next_token())
                     y = float(next_token())
                     value = {'x': x, 'y': y}
-                elif key in ['radius', 'width']:
+                elif key in ['radius', 'width', 'startAngle', 'endAngle']:
                     value = float(next_token())
+                elif key in ['isCounterClockwise']:
+                    t = next_token().strip('"')
+                    value = t == "true"
                 elif key in ['color', 'comment', 'layer']:
                     value = next_token().strip('"')
                 elif key in ['attr']:
@@ -76,7 +99,7 @@ def parse_tokens(tokens):
         while top_token() and top_token() != ')':
             if top_token() == '(':
                 next_token()  # Consume opening '('
-                if top_token() in ['cline', 'line', 'circle', 'polygon']:
+                if top_token() in supported_shapes:
                     shapes.append(parse_shape())
                 else:
                     print(f"Unknown shape type: {top_token()}")
@@ -86,7 +109,8 @@ def parse_tokens(tokens):
         return shapes
 
     # Start parsing from the 'scene' keyword
-    if top_token() and top_token() == '(' and (token_at(1) == 'scene'  or token_at(1) == 'base'):
+    if top_token() and top_token() == '(' and (token_at(1) == 'scene'
+                                               or token_at(1) == 'base'):
         return parse_scene()
     else:
         print("Input does not start with a scene.")
@@ -112,6 +136,7 @@ def serialize_shape(shape):
     serialized += ')'
     return serialized
 
+
 def serialize_shapes(shapes):
     serialized = "(scene\n"
     for shape in shapes:
@@ -124,31 +149,38 @@ def serialize_shapes(shapes):
 def getroot():
     return static_file("index.html", root="./")
 
+
 @get("/<filepath:re:.*\\.ico>")
 def getfavicon(filepath):
     return static_file(filepath, root="./")
+
 
 @get("/<filepath:re:.*\\.html>")
 def gethtml(filepath):
     return static_file(filepath, root="./")
 
+
 @get("/<filepath:re:.*\\.js>")
 def getjavascript(filepath):
     return static_file(filepath, root="./")
+
 
 @get("/css/<filepath:re:.*\\.css>")
 def getcss(filepath):
     return static_file(filepath, root="css")
 
+
 @get("/fonts/<filepath:re:.*>")
 def getfonts(filepath):
     return static_file(filepath, root="fonts")
+
 
 global minCoord, maxCoord, frameOffset, openInput
 minCoord = {}
 maxCoord = {}
 frameOffset = []
 openInput = None
+
 
 def mergePoint(p):
     global minCoord, maxCoord
@@ -161,19 +193,25 @@ def mergePoint(p):
         maxCoord["x"] = max(maxCoord["x"], p["x"])
         maxCoord["y"] = max(maxCoord["y"], p["y"])
 
+
 @get("/data-info")
 def datainfo():
     if len(frameOffset) == 0 or len(minCoord) == 0 or len(maxCoord) == 0:
         return {}
     else:
-        return { "minxy": minCoord, "maxxy": maxCoord, "nframes": len(frameOffset) }
+        return {
+            "minxy": minCoord,
+            "maxxy": maxCoord,
+            "nframes": len(frameOffset)
+        }
+
 
 @get("/frame/<nx>")
 def getFrame(nx):
-    assert(openInput is not None)
+    assert (openInput is not None)
     n = int(nx)
     if n >= len(frameOffset):
-        return { "drawings": [] }
+        return {"drawings": []}
     shapes = []
     if frameOffset[n][1] != -1:
         openInput.seek(frameOffset[n][1])
@@ -184,13 +222,17 @@ def getFrame(nx):
     text = openInput.readline().strip()
     tokens = tokenize(text)
     shapes += parse_tokens(tokens)
-    return { "drawings": shapes }
+    return {"drawings": shapes}
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="serve 2DataViewer")
-    parser.add_argument("--input", "-i", type=str, required=False, help="Input file containing drawings")
-    parser.add_argument("--host",        type=str, default="0.0.0.0", help="listening host address")
-    parser.add_argument("--port", "-p",  type=int, default=3527, help="listening port")
+    parser.add_argument("--input", "-i", type=str,
+                        required=False, help="Input file containing drawings")
+    parser.add_argument("--host",        type=str,
+                        default="0.0.0.0", help="listening host address")
+    parser.add_argument("--port", "-p",  type=int,
+                        default=3527, help="listening port")
     args = parser.parse_args()
 
     baseOffset = -1
@@ -226,7 +268,8 @@ if __name__ == "__main__":
                     elif s["type"] == "polygon":
                         for pt in s["points"]:
                             mergePoint(pt)
-            except:
+            except Exception as e:
+                print(e)
                 pass
 
     run(host=args.host, port=args.port)

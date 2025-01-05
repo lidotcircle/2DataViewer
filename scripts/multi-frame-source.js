@@ -145,6 +145,7 @@ class MultiFrameSource {
             const drawItem = new DrawItem(obj.type)
             Object.assign(drawItem, obj);
             objectList.push(drawItem);
+            DrawItem.recursivelySanitize(drawItem);
         }
         this.m_frameCountSubject.next(n + 1);
         this.m_nextFrameSubject.next(objectList);
@@ -254,7 +255,7 @@ class MultiFrameSource {
                 type: "number",
                 value: currentFrame(),
                 step: "1",
-                min: "1",
+                min: `${this.m_totalFrames.val > 0 ? 1 : 0}`,
                 max: `${this.m_totalFrames.val}`,
                 onclick: event => {
                     const n = event.target.valueAsNumber;

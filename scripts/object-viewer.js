@@ -52,15 +52,24 @@ class ObjectViewer {
         this.m_show = van.state(true);
     }
 
+    sanitizeObj(obj) {
+        const xobj = {};
+        Object.getOwnPropertyNames(obj).forEach((key) => {
+            if (key != "m_shape") {
+                if (typeof (obj[key]) == "object") {
+                    xobj[key] = this.sanitizeObj(obj[key]);
+                } else {
+                    xobj[key] = obj[key];
+                }
+            }
+        });
+        return xobj;
+    }
+
     showObjects(objs) {
         this.m_objects.splice(0);
         for (const obj of objs) {
-            const xobj = {};
-            Object.getOwnPropertyNames(obj).forEach((key) => {
-                if (key != "m_shape") {
-                    xobj[key] = obj[key];
-                }
-            })
+            const xobj = this.sanitizeObj(obj);
             this.m_objects.push(van.noreactive(xobj));
         }
         this.m_objectCount.val = this.m_objects.length;
