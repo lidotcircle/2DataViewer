@@ -165,6 +165,11 @@ def getjavascript(filepath):
     return static_file(filepath, root="./")
 
 
+@get("/<filepath:re:.*\\.wasm>")
+def getwasm(filepath):
+    return static_file(filepath, root="./")
+
+
 @get("/css/<filepath:re:.*\\.css>")
 def getcss(filepath):
     return static_file(filepath, root="css")

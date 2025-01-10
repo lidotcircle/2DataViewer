@@ -1,13 +1,11 @@
 import { DrawItem } from './draw-item.js';
-import { Point, Polygon } from './thirdparty/flatten.js';
 import { ObjectFilter } from './object-filter.js';
-import RBush from './thirdparty/rbush.js';
+import { RTree, Shape, Point } from './thirdparty/h2g.js';
 import { Observable, Subject } from './thirdparty/rxjs.js';
 import { SettingManager } from './settings.js';
 import { runBeforeNextFrame } from './common.js';
 
 
-const RTREE_ITEM_ID = Symbol('RTREE_ITEM_ID');
 class ObjectsInLayer {
     /**
      * @param {string} layerName
@@ -26,7 +24,7 @@ class ObjectsInLayer {
         /** @private */
         this.m_visibleObjects = [];
         /** @private */
-        this.m_objectRTree = new RBush();
+        this.m_objectRTree = new RTree();
         /** @private */
         this.m_visibleObjectsUpdateSubject = new Subject();
 
@@ -89,7 +87,8 @@ class ObjectsInLayer {
 
     setDrawingObjects(objects) {
         this.m_objects = [];
-        this.m_objectRTree.clear();
+        this.m_objectRTree.delete();
+        this.m_objectRTree = new RTree();
         for (let obj of objects) {
             this.addDrawingObjectNoUpdateVisible(obj);
         }
@@ -100,15 +99,7 @@ class ObjectsInLayer {
     addDrawingObjectNoUpdateVisible(obj) {
         this.m_objects.push(obj);
         const box = obj.getBox();
-        const item = {
-            minX: box.getBL().x,
-            minY: box.getBL().y,
-            maxX: box.getTR().x,
-            maxY: box.getTR().y,
-            object: obj
-        };
-        this.m_objectRTree.insert(item);
-        obj[RTREE_ITEM_ID] = item;
+        this.m_objectRTree.insert(box.getBL().x, box.getBL().y, box.getTR().x, box.getTR().y, obj);
     }
 
     addDrawingObject(obj) {
@@ -120,10 +111,8 @@ class ObjectsInLayer {
         const idx = this.m_objects.indexOf(obj);
         if (idx != -1) {
             this.m_objects.splice(idx, 1);
-            const item = obj[RTREE_ITEM_ID];
-            if (item != null) {
-                this.m_objectRTree.remove(item);
-            }
+            const box = obj.getBox();
+            this.m_objectRTree.remove(box.getBL().x, box.getBL().y, box.getTR().x, box.getTR().y, obj);
             this.updateBeforeNextFrame();
         }
     }
@@ -134,7 +123,8 @@ class ObjectsInLayer {
 
     clear() {
         this.m_objects = [];
-        this.m_objectRTree.clear();
+        this.m_objectRTree.delete();
+        this.m_objectRTree = new RTree();
         this.updateBeforeNextFrame();
     }
 
@@ -158,29 +148,21 @@ class ObjectsInLayer {
             return [];
         }
 
-        const bn = box.inflate(1);
-        const polygon = new Polygon([
+        const bn = box;
+        const polygon = Shape.CreatePolygon([
             new Point(bn.minX, bn.minY), new Point(bn.maxX, bn.minY),
             new Point(bn.maxX, bn.maxY), new Point(bn.minX, bn.maxY)
         ]);
-        const rtreeCollide = this.m_objectRTree.search({
-            minX: box.getBL().x,
-            minY: box.getBL().y,
-            maxX: box.getTR().x,
-            maxY: box.getTR().y
-        });
+        const rtreeCollide = this.m_objectRTree.query(
+            box.getBL().x, box.getBL().y, box.getTR().x, box.getTR().y);
         const objects = [];
-        for (let item of rtreeCollide) {
-            if (!this.m_objectFilter.match(item.object)) {
+        for (let obj of rtreeCollide) {
+            if (!this.m_objectFilter.match(obj)) {
                 continue;
             }
-            const distance = polygon.distanceTo(item.object.shape());
-            const mindis = (item.object.width || 0) / 2;
-            if (distance[0] <= mindis ||
-                polygon.contains(item.object.shape()) ||
-                (item.object.type == 'polygon' &&
-                    item.object.shape().contains(polygon))) {
-                objects.push(item.object);
+            const distanceInfo = polygon.distance(obj.shape());
+            if (distanceInfo.distance == 0) {
+                objects.push(obj);
             }
         }
         return objects;

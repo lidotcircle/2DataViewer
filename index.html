@@ -14,15 +14,19 @@
 <body>
   <div id="app" style="width: 100%; height: 100%"></div>
 
+  <script> window.h2g_url = '/scripts/thirdparty/libh2g.js'; </script>
   <script type="module">
     import {MainApp} from './scripts/main.js'
     import Van from './scripts/thirdparty/van.js'
     import jss from './scripts/thirdparty/jss.js'
     import preset from './scripts/thirdparty/jss-preset-default.js'
+    import {h2g} from './scripts/thirdparty/h2g.js'
 
     jss.setup(preset());
-    let app = new MainApp();
-    Van.add(document.getElementById('app'), app);
+    h2g.ready().then(() => {
+      let app = new MainApp();
+      Van.add(document.getElementById('app'), app);
+    });
   </script>
 
   <!-- 

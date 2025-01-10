@@ -1,5 +1,5 @@
 import { BoundingBox, PointAdd, PointSub } from './common.js';
-import { Arc, Circle, Point, Polygon, Segment } from './thirdparty/flatten.js';
+import { Shape, Point } from './thirdparty/h2g.js';
 import { DrawTextInCanvasAcrossLine } from './canvas-utils.js';
 
 
@@ -86,45 +86,59 @@ class DrawItem {
     }
 
     getBox() {
-        if (this.type == 'circle') {
-            const r = this.radius;
-            const c = this.center;
-            return new BoundingBox(
-                PointSub(c, { x: r, y: r }), PointAdd(c, { x: r, y: r }));
-        } else if (this.type == 'line') {
-            return new BoundingBox(this.point1, this.point2)
-                .inflate(this.width / 2);
-        } else if (this.type == 'cline') {
-            return new BoundingBox(this.point1, this.point2)
-                .inflate(this.width / 2);
-        } else if (this.type == 'polygon') {
-            let box = null;
-            for (let pt of this.points) {
-                if (box == null) {
-                    box = new BoundingBox(pt, pt);
+        const s = this.shape();
+        const box = s.box();
+        return new BoundingBox(
+            new Point(box.origin.x, box.origin.y),
+            new Point(box.origin.x + box.width, box.origin.y + box.height)
+        );
+    }
+
+    /** @private */
+    static createShape(item) {
+        switch (item.type) {
+            case 'circle':
+                return Shape.CreateCircle(toPoint(item.center), item.radius);
+            case 'line':
+                if (item.width) {
+                    return Shape.CreateLineWithWidth(toPoint(item.point1), toPoint(item.point2), item.width);
                 } else {
-                    box = box.mergePoint(pt);
+                    return Shape.CreateLineShape(toPoint(item.point1), toPoint(item.point2));
                 }
-            }
-            return box;
-        } else if (this.type == 'compound') {
-            let box = null;
-            for (let shape of this.shapes) {
-                if (box == null) {
-                    box = shape.getBox();
+            case 'cline':
+                if (item.width) {
+                    return Shape.CreateLineWithWidthCircleEndpoints(toPoint(item.point1), toPoint(item.point2), item.width);
                 } else {
-                    box = box.mergeBox(shape.getBox());
+                    return Shape.CreateLineShape(toPoint(item.point1), toPoint(item.point2));
                 }
-            }
-            return box;
-        } else if (this.type == 'arc') {
-            // TODO
-            const r = this.radius;
-            const c = this.center;
-            return new BoundingBox(
-                PointSub(c, { x: r, y: r }), PointAdd(c, { x: r, y: r }));
-        } else {
-            return null;
+            case 'polygon':
+                return Shape.CreatePolygon(item.points);
+            case 'compound':
+                {
+                    const ans = Shape.CreateCompound();
+                    for (const s of item.shapes) {
+                        const xs = DrawItem.createShape(s);
+                        ans.addShape(xs);
+                        xs.delete();
+                    }
+                    return ans;
+                }
+            case 'arc':
+                {
+                    const x1 = Math.cos(item.startAngle * Math.PI / 180);
+                    const y1 = Math.sin(item.startAngle * Math.PI / 180);
+                    const x2 = Math.cos(item.endAngle * Math.PI / 180);
+                    const y2 = Math.sin(item.endAngle * Math.PI / 180);
+                    const p1 = new Point(item.center.x + x1, item.center.y + y1);
+                    const p2 = new Point(item.center.x + x2, item.center.y + y2);
+                    if (item.width) {
+                        return Shape.CreateArcSegWithWidthCircleEndpoints(p1, p2, item.radius, item.isCounterClockwise, item.width);
+                    } else {
+                        return Shape.CreateArcSeg(p1, p2, item.radius, item.isCounterClockwise);
+                    }
+                }
+            default:
+                return Shape.CreateNoneShape();
         }
     }
 
@@ -134,34 +148,7 @@ class DrawItem {
         }
 
         sanitizePoints(this);
-        switch (this.type) {
-            case 'circle':
-                this.m_shape = new Circle(toPoint(this.center), this.radius);
-                break;
-            case 'line':
-                this.m_shape =
-                    new Segment(toPoint(this.point1), toPoint(this.point2));
-                break;
-            case 'cline':
-                this.m_shape =
-                    new Segment(toPoint(this.point1), toPoint(this.point2));
-                break;
-            case 'polygon':
-                this.m_shape = new Polygon(this.points);
-                break;
-            case 'compound':
-                // TODO
-                this.m_shape = this.shapes[0].shape();
-                break;
-            case 'arc':
-                this.m_shape = new Arc(
-                    toPoint(this.center), this.radius, this.startAngle,
-                    this.endAngle, this.isCounterClockwise);
-                break;
-            default:
-                this.m_shape = null;
-                break;
-        }
+        this.m_shape = DrawItem.createShape(this);
         return this.m_shape;
     }
 
