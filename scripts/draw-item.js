@@ -125,10 +125,10 @@ class DrawItem {
                 }
             case 'arc':
                 {
-                    const x1 = Math.cos(item.startAngle * Math.PI / 180);
-                    const y1 = Math.sin(item.startAngle * Math.PI / 180);
-                    const x2 = Math.cos(item.endAngle * Math.PI / 180);
-                    const y2 = Math.sin(item.endAngle * Math.PI / 180);
+                    const x1 = Math.cos(item.startAngle * Math.PI / 180) * item.radius;
+                    const y1 = Math.sin(item.startAngle * Math.PI / 180) * item.radius;
+                    const x2 = Math.cos(item.endAngle * Math.PI / 180) * item.radius;
+                    const y2 = Math.sin(item.endAngle * Math.PI / 180) * item.radius;
                     const p1 = new Point(item.center.x + x1, item.center.y + y1);
                     const p2 = new Point(item.center.x + x2, item.center.y + y2);
                     if (item.width) {
@@ -274,7 +274,7 @@ class DrawItem {
             const path = new Path2D();
             const startRad = item.startAngle * Math.PI / 180;
             const endRad = item.endAngle * Math.PI / 180;
-            path.arc(item.center.x, item.center.y, item.radius, startRad, endRad, item.isCounterClockwise);
+            path.arc(item.center.x, item.center.y, item.radius, startRad, endRad, !item.isCounterClockwise);
             ctx.stroke(path);
             if (item.comment) {
                 ctx.fillStyle = 'white';
