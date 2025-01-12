@@ -68,6 +68,10 @@ class Shape {
         this.m_obj = null;
     }
 
+    asString() {
+        return this.m_obj.asString();
+    }
+
     TypeAsString() {
         return this.m_obj.TypeAsString();
     }
