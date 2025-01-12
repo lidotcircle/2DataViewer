@@ -135,6 +135,10 @@ class ObjectsInLayer {
         });
     }
 
+    get allObjects() {
+        return this.m_objects;
+    }
+
     get visibleObjects() {
         return this.m_visibleObjects;
     }
@@ -265,6 +269,12 @@ class ObjectManager {
         layerInfo.addDrawingObject(obj);
     }
 
+    addDrawingObjects(objects) {
+        for (const obj of objects) {
+            this.addDrawingObject(obj);
+        }
+    }
+
     removeDrawingObject(obj) {
         const layerInfo = this.m_layers.find(
             layerInfo => layerInfo.layerName == obj.layer);
@@ -277,6 +287,14 @@ class ObjectManager {
         for (const obj of objs) {
             this.removeDrawingObject(obj);
         }
+    }
+
+    getObjects() {
+        const objects = [];
+        for (let layer of this.m_layers) {
+            objects.push(...layer.allObjects);
+        }
+        return objects;
     }
 
     clear() {

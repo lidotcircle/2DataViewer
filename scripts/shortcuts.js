@@ -11,12 +11,15 @@ function SetupShortcuts(app, objViewer) {
     const objMgr = app.ObjectManager;
     const filter = app.ObjectFilter;
     const loader = app.FrameLoader;
+    const transMgr = app.TransactionManager;
     hotkeys('ctrl+i', () => objViewer.toggle());
     hotkeys('ctrl+m', () => filter.toggleFilterViewer());
     hotkeys('del', () => {
         const objs = objMgr.selectedObjects;
         if (objs.length > 0) {
-            objMgr.removeDrawingObjects(objs);
+            const trans = transMgr.beginTransaction();
+            trans.RemoveItems(objs);
+            trans.commit();
             objMgr.clearSelection();
         }
     });

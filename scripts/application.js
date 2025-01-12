@@ -9,6 +9,7 @@ import { BoundingBox, text2htmlElement } from './common.js';
 import { MultiFrameSource } from './multi-frame-source.js';
 import Van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
+import { TransactionManager } from './transaction-manager.js';
 
 
 class Tool {
@@ -166,6 +167,8 @@ class Application {
         /** @private */
         this.m_objectManager =
             new ObjectManager(this.m_objectFilter, this.m_settingManager);
+        /** @private */
+        this.m_transactionMgr = new TransactionManager(this.m_objectManager);
 
         /** @private */
         this.m_hoverPositionSubject = new Subject();
@@ -251,6 +254,10 @@ class Application {
 
     get ObjectManager() {
         return this.m_objectManager;
+    }
+
+    get TransactionManager() {
+        return this.m_transactionMgr;
     }
 
     get ObjectFilter() {

@@ -1,4 +1,4 @@
-import { BoundingBox, PointAdd, PointSub } from './common.js';
+import { AffineTransformation, BoundingBox, PointAdd, PointSub } from './common.js';
 import { Shape, Point } from './thirdparty/h2g.js';
 import { DrawTextInCanvasAcrossLine } from './canvas-utils.js';
 
@@ -83,6 +83,81 @@ class DrawItem {
 
     setColor(color) {
         this.color = color;
+    }
+
+    /** @private */
+    deepCopyObject(obj) {
+        const ans = {};
+        for (const key in Object.getOwnPropertyNames(obj)) {
+            const o = obj[key];
+            if (o instanceof DrawItem) {
+                ans[key] = o.clone();
+            } else if (typeof (o) == "object" && o !== null) {
+                ans[key] = this.deepCopyObject(o);
+            } else {
+                ans[key] = obj[key];
+            }
+        }
+        return ans;
+    }
+
+    clone() {
+        const ans = new DrawItem(this.type);
+        for (const key in Object.getOwnPropertyNames(this)) {
+            if (key == 'm_shape') {
+                continue;
+            }
+
+            if (typeof (this[key]) == "object") {
+                ans[key] = this.deepCopyObject(this[key]);
+            } else {
+                ans[key] = this[key];
+            }
+        }
+        return ans;
+    }
+
+    /** 
+      * @private
+      * @param {AffineTransformation} transform 
+      */
+    applyTransform(transform) {
+        const recursiveApplyToPoint = obj => {
+            if (typeof (obj) == "object" && obj !== null) {
+                const props = Object.getOwnPropertyNames(obj);
+                for (const key in props) {
+                    const o = obj[key];
+                    if (o instanceof Shape) {
+                        delete obj[key];
+                        continue;
+                    } else if (o instanceof Point) {
+                        const xy = transform.applyXY(o);
+                        obj[key] = new Point(xy.x, xy.y);
+                    } else {
+                        recursiveApplyToPoint(obj[key]);
+                    }
+                }
+            }
+        };
+    }
+
+    /**
+     * @private
+     * @param {AffineTransformation} transform
+     */
+    cloneAndApplyTransform(transform) {
+        const ans = this.clone();
+        ans.applyTransform(transform);
+        return ans;
+    }
+
+    /**
+     * @param {Point} offset
+     * @return {DrawItem} new object with offset
+     */
+    move(offset) {
+        const transform = new AffineTransformation.translate(offset.x, offset.y);
+        return this.cloneAndApplyTransform(transform);
     }
 
     getBox() {
