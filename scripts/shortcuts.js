@@ -23,8 +23,11 @@ function SetupShortcuts(app, objViewer) {
             objMgr.clearSelection();
         }
     });
-    hotkeys('esc', () => {
+    hotkeys('escape', () => {
         objMgr.clearSelection();
+        if (app.CommandLineBar.isShow()) {
+            app.CommandLineBar.hide();
+        }
     });
     hotkeys('left', () => {
         if (loader.TotalFrames > 0) {
@@ -43,6 +46,9 @@ function SetupShortcuts(app, objViewer) {
         } else {
             loader.Pause();
         }
+    });
+    hotkeys('c', () => {
+        app.CommandLineBar.show();
     });
 }
 

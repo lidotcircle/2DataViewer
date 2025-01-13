@@ -52,7 +52,7 @@ class TransactionManager {
      */
     redo() {
         if (this.m_currentTransactionIndex == 0 && !this.m_transactions[this.m_currentTransactionIndex].applied()) {
-            this.m_transactions[this.m_currentTransactionIndex + 1].commit();
+            this.m_transactions[this.m_currentTransactionIndex].commit();
         } else if (this.m_currentTransactionIndex + 1 < this.m_transactions.length
             && !this.m_transactions[this.m_currentTransactionIndex + 1].applied()) {
             console.assert(this.m_transactions[this.m_currentTransactionIndex].applied());

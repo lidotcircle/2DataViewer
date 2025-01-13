@@ -10,6 +10,7 @@ import { MultiFrameSource } from './multi-frame-source.js';
 import Van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
 import { TransactionManager } from './transaction-manager.js';
+import { CommandLine } from './command-line.js';
 
 
 class Tool {
@@ -169,6 +170,8 @@ class Application {
             new ObjectManager(this.m_objectFilter, this.m_settingManager);
         /** @private */
         this.m_transactionMgr = new TransactionManager(this.m_objectManager);
+        /** @private */
+        this.m_commandLineBar = new CommandLine(this);
 
         /** @private */
         this.m_hoverPositionSubject = new Subject();
@@ -264,6 +267,10 @@ class Application {
         return this.m_objectFilter;
     }
 
+    get CommandLineBar() {
+        return this.m_commandLineBar;
+    }
+
     get FrameLoader() {
         return this.m_frameLoader;
     }
@@ -290,6 +297,7 @@ class Application {
                 return Van.tags.div({ class: this.m_classes.title }, Van.tags.h1("2D Data Viewer"));
             },
             Van.tags.div({ class: this.m_classes.screen },
+                this.m_commandLineBar,
                 this.m_objectFilter,
                 this.m_viewport.element,
                 this.m_appEvents.element,

@@ -1,6 +1,7 @@
 import { DrawItem } from './draw-item.js';
-import { ObjectManager } from './object-manager.js';
-import { Viewport } from './viewport.js';
+import van from './thirdparty/van.js';
+import jss from './thirdparty/jss.js';
+import { Application } from './application.js';
 
 
 function splitString(input) {
@@ -24,12 +25,115 @@ function splitString(input) {
 
 class CommandLine {
     /**
-     * @param {ObjectManager} objectManager
-     * @param {Viewport} viewport
+     * @param {Application} application
      */
-    constructor(objectManager, viewport) {
-        this.m_objectManager = objectManager;
-        this.m_viewport = viewport;
+    constructor(application) {
+        this.m_application = application;
+        this.m_objectManager = application.ObjectManager;
+        this.m_viewport = application.Viewport;
+        const { classes } = jss.createStyleSheet({
+            cmdline: {
+                width: "80%",
+                height: "2em",
+                position: "absolute",
+                background: "rgba(45, 68, 108, 0.3)",
+                bottom: "5%",
+                left: "10%",
+                "border-radius": "0.5em",
+                "z-index": 99,
+            },
+            cmdlineHide: {
+                display: "none",
+            },
+            inputcl: {
+                width: "100%",
+                height: "100%",
+                background: "transparent",
+                outline: "none",
+                border: "0em",
+                padding: "0em 1em",
+                color: "white",
+                "caret-color": "white",
+            },
+        }).attach();
+        this.m_show = van.state(false);
+        this.m_classes = classes;
+        this.m_cmdHistories = [];
+        this.m_currentCmd = -1;
+        this.m_tempCmd = '';
+        if (localStorage.getItem('cmdHistories')) {
+            this.m_cmdHistories = JSON.parse(localStorage.getItem('cmdHistories'))
+        }
+    }
+
+    render() {
+        const inputx = van.tags.input({
+            class: this.m_classes.inputcl,
+            type: 'text',
+            autocomplete: 'off',
+            onkeyup: event => {
+                event.stopPropagation();
+            },
+            onkeydown: event => {
+                event.stopPropagation();
+                if (event.key == 'Enter') {
+                    const cmd = event.target.value.trim();
+                    this.evalCommand(cmd);
+                    event.target.value = '';
+                } else if (event.key == 'ArrowUp' || (event.key == 'p' && event.ctrlKey)) {
+                    if (this.m_currentCmd == -1 && this.m_cmdHistories.length > 0) {
+                        this.m_currentCmd = this.m_cmdHistories.length - 1;
+                        this.m_tempCmd = event.target.value;
+                        event.target.value = this.m_cmdHistories[this.m_currentCmd];
+                    } else if (this.m_currentCmd > 0) {
+                        if (event.target.value != this.m_cmdHistories[this.m_currentCmd]) {
+                            this.m_tempCmd = event.target.value;
+                        }
+                        this.m_currentCmd--;
+                        event.target.value = this.m_cmdHistories[this.m_currentCmd];
+                    }
+                } else if (event.key == 'ArrowDown' || (event.key == 'n' && event.ctrlKey)) {
+                    if (this.m_currentCmd >= 0) {
+                        if (this.m_currentCmd + 1 == this.m_cmdHistories.length) {
+                            this.m_currentCmd = -1;
+                            event.target.value = this.m_tempCmd;
+                        } else {
+                            if (event.target.value != this.m_cmdHistories[this.m_currentCmd]) {
+                                this.m_tempCmd = event.target.value;
+                            }
+                            this.m_currentCmd++;
+                            event.target.value = this.m_cmdHistories[this.m_currentCmd];
+                        }
+                    }
+                } else if (event.key == 'Escape') {
+                    this.m_show.val = false;
+                }
+            },
+        });
+
+        if (this.m_show.val) {
+            setTimeout(() => {
+                inputx.focus();
+            });
+        }
+        const hideX = this.m_show.val ? '' : " " + this.m_classes.cmdlineHide;
+        return van.tags.div(
+            { class: this.m_classes.cmdline + hideX },
+            inputx
+        );
+    }
+
+    isShow() {
+        return this.m_show.rawVal;
+    }
+
+    show() {
+        this.m_tempCmd = '';
+        this.m_show.val = true;
+    }
+
+    hide() {
+        this.m_show.val = false;
     }
 
     /** @private */
@@ -113,12 +217,28 @@ class CommandLine {
         }
     }
 
+    /** @private */
+    evalCommand(cmd) {
+        try {
+            this.ExecuteCommand(cmd);
+        } catch (err) {
+            return;
+        }
+
+        this.m_cmdHistories.push(cmd);
+        this.hide();
+        localStorage.setItem('cmdHistories', JSON.stringify(this.m_cmdHistories));
+    }
 
     /** @public */
     ExecuteCommand(cmd) {
         const c = cmd.split(' ')[0];
         if (c === 'draw') {
             this.cmdDraw(cmd.substr(5));
+        } else if (c === 'undo') {
+            this.m_application.TransactionManager.rollback();
+        } else if (c === 'redo') {
+            this.m_application.TransactionManager.redo();
         } else if (c === 'clear') {
             this.cmdClear();
             this.refreshAllLayers();
