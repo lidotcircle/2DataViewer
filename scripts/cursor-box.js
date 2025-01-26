@@ -1,4 +1,4 @@
-import { BoundingBox, genStyle } from './common.js';
+import { BoundingBox, genStyle } from './core/common.js';
 import { Subject } from './thirdparty/rxjs.js';
 import Van from './thirdparty/van.js';
 

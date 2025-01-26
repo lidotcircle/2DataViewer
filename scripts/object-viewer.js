@@ -1,6 +1,6 @@
 import van from "./thirdparty/van.js";
 import jss from "./thirdparty/jss.js";
-import { genStyle } from "./common.js";
+import { genStyle } from "./core/common.js";
 
 
 class ObjectViewer {

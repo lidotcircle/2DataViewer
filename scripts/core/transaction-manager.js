@@ -47,6 +47,10 @@ class TransactionManager {
         return this.m_transactions[this.m_currentTransactionIndex];
     }
 
+    currentTransaction() {
+        return this.m_transactions[this.m_currentTransactionIndex];
+    }
+
     /**
      * @return {boolean}
      */

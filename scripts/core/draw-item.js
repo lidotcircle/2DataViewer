@@ -1,6 +1,6 @@
 import { AffineTransformation, BoundingBox, PointAdd, PointSub } from './common.js';
-import { Shape, Point } from './thirdparty/h2g.js';
 import { DrawTextInCanvasAcrossLine } from './canvas-utils.js';
+import { Shape, Point } from '../thirdparty/h2g.js';
 
 
 function toPoint(p) {
@@ -79,6 +79,10 @@ class DrawItem {
 
     constructor(type) {
         this.type = type;
+        // make linter happy
+        if (1 == 2) {
+            this.shapes = null;
+        }
     }
 
     setColor(color) {

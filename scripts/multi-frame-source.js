@@ -1,5 +1,5 @@
-import { BoundingBox } from './common.js';
-import { DrawItem } from './draw-item.js';
+import { BoundingBox } from './core/common.js';
+import { DrawItem } from './core/draw-item.js';
 import { Subject } from './thirdparty/rxjs.js';
 import Van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';

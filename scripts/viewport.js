@@ -1,5 +1,5 @@
-import { DrawTextInCanvasAcrossLine, FixedColorCanvasRenderingContext2D } from './canvas-utils.js';
-import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, Perpendicular, PointAdd, PointSub, runBeforeNextFrame, VecLength, VecResize } from './common.js';
+import { DrawTextInCanvasAcrossLine, FixedColorCanvasRenderingContext2D } from './core/canvas-utils.js';
+import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, Perpendicular, PointAdd, PointSub, runBeforeNextFrame, VecLength, VecResize } from './core/common.js';
 import { Observable, Subject } from './thirdparty/rxjs.js';
 
 

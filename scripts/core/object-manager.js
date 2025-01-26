@@ -1,8 +1,8 @@
 import { DrawItem } from './draw-item.js';
 import { ObjectFilter } from './object-filter.js';
-import { RTree, Shape, Point } from './thirdparty/h2g.js';
-import { Observable, Subject } from './thirdparty/rxjs.js';
-import { SettingManager } from './settings.js';
+import { RTree, Shape, Point } from '../thirdparty/h2g.js';
+import { Observable, Subject } from '../thirdparty/rxjs.js';
+import { SettingManager } from '../settings.js';
 import { runBeforeNextFrame } from './common.js';
 
 

@@ -1,6 +1,6 @@
-import { Observable, Subject } from './thirdparty/rxjs.js';
-import van from './thirdparty/van.js';
-import jss from './thirdparty/jss.js';
+import { Observable, Subject } from '../thirdparty/rxjs.js';
+import van from '../thirdparty/van.js';
+import jss from '../thirdparty/jss.js';
 import { genStyle } from './common.js';
 
 class FilterRule {

@@ -1,16 +1,14 @@
 import { CursorBox } from './cursor-box.js';
-import { ObjectFilter } from './object-filter.js';
-import { ObjectManager } from './object-manager.js';
 import { SettingManager } from './settings.js';
 import { Viewport } from './viewport.js';
 import { Subject } from './thirdparty/rxjs.js';
-import { DrawItem } from './draw-item.js';
-import { BoundingBox, text2htmlElement } from './common.js';
+import { DrawItem } from './core/draw-item.js';
+import { BoundingBox, text2htmlElement } from './core/common.js';
 import { MultiFrameSource } from './multi-frame-source.js';
 import Van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
-import { TransactionManager } from './transaction-manager.js';
 import { CommandLine } from './command-line.js';
+import { OpDispatcher } from './core/op-dispatcher.js';
 
 
 class Tool {
@@ -162,14 +160,10 @@ class Application {
         this.m_classes = classes;
 
         /** @private */
-        this.m_objectFilter = new ObjectFilter();
-        /** @private */
         this.m_settingManager = new SettingManager();
         /** @private */
-        this.m_objectManager =
-            new ObjectManager(this.m_objectFilter, this.m_settingManager);
-        /** @private */
-        this.m_transactionMgr = new TransactionManager(this.m_objectManager);
+        this.m_opDispatcher = new OpDispatcher(this.m_settingManager);
+
         /** @private */
         this.m_commandLineBar = new CommandLine(this);
 
@@ -191,11 +185,12 @@ class Application {
             const bl = this.m_viewport.ViewportCoordToGlobalCoord(box.getBL());
             const tr = this.m_viewport.ViewportCoordToGlobalCoord(box.getTR());
             const gbox = new BoundingBox(bl, tr);
-            this.m_objectManager.selectObjectsInBox(gbox);
+            this.m_opDispatcher.applySelectionBox(gbox);
             // fullviewport.classList.add('selection-mode');
         });
         this.m_appEvents.selectionBoxClearEventObservable.subscribe(() => {
             this.m_viewport.clearSelectionBox();
+            // this.m_opDispatcher.clearSelection();
             // fullviewport.classList.remove('selection-mode');
         });
 
@@ -210,16 +205,16 @@ class Application {
             this.m_hoverPositionSubject.next(realPt);
         });
 
-        this.m_objectManager.addLayerObservable.subscribe(layerName => {
+        this.ObjectManager.addLayerObservable.subscribe(layerName => {
             this.m_viewport.AddLayer(layerName);
         });
-        this.m_objectManager.layerVisibleObjectChangeObservable.subscribe(
+        this.ObjectManager.layerVisibleObjectChangeObservable.subscribe(
             layerName => {
                 this.m_viewport.DrawLayerObjects(
                     layerName,
-                    this.m_objectManager.getVisibleObjects(layerName));
+                    this.ObjectManager.getVisibleObjects(layerName));
             });
-        this.m_objectManager.selectedObjectsObservable.subscribe(objects => {
+        this.ObjectManager.selectedObjectsObservable.subscribe(objects => {
             this.m_viewport.DrawSelectedItem(objects);
         });
 
@@ -244,7 +239,7 @@ class Application {
      * @param {DrawItem[]} objects
      */
     SetDrawingObjects(objects) {
-        this.m_objectManager.setDrawingObjects(objects);
+        this.ObjectManager.setDrawingObjects(objects);
     }
 
     get Viewport() {
@@ -256,15 +251,15 @@ class Application {
     }
 
     get ObjectManager() {
-        return this.m_objectManager;
+        return this.m_opDispatcher.ObjectManager;
     }
 
     get TransactionManager() {
-        return this.m_transactionMgr;
+        return this.m_opDispatcher.TransactionManager;
     }
 
     get ObjectFilter() {
-        return this.m_objectFilter;
+        return this.m_opDispatcher.ObjectFilter;
     }
 
     get CommandLineBar() {
@@ -298,7 +293,7 @@ class Application {
             },
             Van.tags.div({ class: this.m_classes.screen },
                 this.m_commandLineBar,
-                this.m_objectFilter,
+                this.ObjectFilter,
                 this.m_viewport.element,
                 this.m_appEvents.element,
             ),

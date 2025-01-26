@@ -1,4 +1,4 @@
-import { DrawItem } from './draw-item.js';
+import { DrawItem } from './core/draw-item.js';
 import van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
 import { Application } from './application.js';
