@@ -250,6 +250,10 @@ class Application {
         return this.m_appEvents;
     }
 
+    get OpDispatcher() {
+        return this.m_opDispatcher;
+    }
+
     get ObjectManager() {
         return this.m_opDispatcher.ObjectManager;
     }

@@ -5,7 +5,7 @@ import { SettingManager } from '../settings.js';
 import { BoundingBox } from './common.js';
 import {
     AbortTransactionOperation,
-    BeginTransactionOperation, CommitTransactionOperation, RedoOperation,
+    BeginTransactionOperation, CommitTransactionOperation, ObjClearOperation, RedoOperation,
     SelectionBoxOperation, SelectionClearOperation, UndoOperation
 } from './app-operation.js';
 import { Observable, Subject } from '../thirdparty/rxjs.js';
@@ -79,6 +79,11 @@ class OpDispatcher {
 
     abortTransaction() {
         const op = new AbortTransactionOperation(this);
+        this.execute(op);
+    }
+
+    clearObjects() {
+        const op = new ObjClearOperation(this);
         this.execute(op);
     }
 

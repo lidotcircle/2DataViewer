@@ -106,6 +106,19 @@ class RedoOperation extends AppOperation {
     }
 }
 
+class ObjClearOperation extends AppOperation {
+    constructor(dispatcher) {
+        super(dispatcher);
+        this.m_opName = "obj-clear";
+    }
+
+    apply() {
+        const trans = this.m_dispatcher.TransactionManager.beginTransaction();
+        trans.Clear();
+        trans.commit();
+    }
+}
+
 /**
  * @param {{name: string, data: string}} data
  * @return {AppOperation}
@@ -133,4 +146,5 @@ function DeserializeAppOperation(dispatcher, data) {
 export {
     AppOperation, DeserializeAppOperation, SelectionBoxOperation, SelectionClearOperation,
     BeginTransactionOperation, CommitTransactionOperation, AbortTransactionOperation, UndoOperation, RedoOperation,
+    ObjClearOperation,
 };

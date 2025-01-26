@@ -143,7 +143,7 @@ class CommandLine {
 
     /** @private */
     cmdClear() {
-        this.m_objectManager.clearAll();
+        this.m_objectManager.clear();
     }
 
     /** @private */
@@ -225,9 +225,12 @@ class CommandLine {
             return;
         }
 
-        this.m_cmdHistories.push(cmd);
+        if (this.m_cmdHistories.length == 0 ||
+            this.m_cmdHistories[this.m_cmdHistories.length - 1] != cmd) {
+            this.m_cmdHistories.push(cmd);
+            localStorage.setItem('cmdHistories', JSON.stringify(this.m_cmdHistories));
+        }
         this.hide();
-        localStorage.setItem('cmdHistories', JSON.stringify(this.m_cmdHistories));
     }
 
     /** @public */
@@ -236,13 +239,11 @@ class CommandLine {
         if (c === 'draw') {
             this.cmdDraw(cmd.substr(5));
         } else if (c === 'undo') {
-            this.m_application.TransactionManager.rollback();
+            this.m_application.OpDispatcher.rollback();
         } else if (c === 'redo') {
-            this.m_application.TransactionManager.redo();
+            this.m_application.OpDispatcher.redo();
         } else if (c === 'clear') {
-            this.cmdClear();
-            this.refreshAllLayers();
-            this.clearSelectionBox();
+            this.m_application.OpDispatcher.clearObjects();
         } else if (c === 'zoom') {
             this.cmdZoom();
         } else if (c === 'set') {
