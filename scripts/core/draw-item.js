@@ -68,6 +68,7 @@ class DrawItem {
         return ans;
     }
 
+    /** @private */
     static recursivelySanitize(item) {
         if (item.type == 'compound') {
             for (let shape of item.shapes) {
@@ -221,6 +222,36 @@ class DrawItem {
         }
     }
 
+    /** @private */
+    static toPlainObject(obj) {
+        const xobj = {};
+        Object.getOwnPropertyNames(obj).forEach((key) => {
+            if (key != "m_shape") {
+                if (typeof (obj[key]) == "object") {
+                    xobj[key] = this.toPlainObject(obj[key]);
+                } else {
+                    xobj[key] = obj[key];
+                }
+            }
+        });
+    }
+
+    plainObject() {
+        return DrawItem.toPlainObject(this);
+    }
+
+    static plainObject2DrawItem(items) {
+        const objectList = [];
+        for (let obj of items) {
+            console.assert(obj.type);
+            const drawItem = new DrawItem(obj.type)
+            Object.assign(drawItem, obj);
+            objectList.push(drawItem);
+            DrawItem.recursivelySanitize(drawItem);
+        }
+        return objectList
+    }
+
     shape() {
         if (this.m_shape != null) {
             return this.m_shape;
@@ -367,4 +398,17 @@ class DrawItem {
 }
 
 
-export { DrawItem };
+/**
+ * @param {DrawItem[]} items
+ * @return {string}
+ */
+function SerializeDrawItems(items) {
+    return JSON.stringify(items.map(item => item.plainObject()));
+}
+
+function DeserializeDrawItems(str) {
+    return DrawItem.plainObject2DrawItem(JSON.parse(str));
+}
+
+
+export { DrawItem, SerializeDrawItems, DeserializeDrawItems };

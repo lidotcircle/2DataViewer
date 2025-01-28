@@ -76,7 +76,8 @@ class Application {
         this.m_frameLoader = new MultiFrameSource();
 
         this.m_frameLoader.nextFrameObservable.subscribe((drawItems) => {
-            this.SetDrawingObjects(drawItems);
+            this.OpDispatcher.clearObjects();
+            this.OpDispatcher.addObjects(drawItems);
         });
 
         const { classes } = jss.createStyleSheet({

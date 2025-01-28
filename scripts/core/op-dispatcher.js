@@ -5,8 +5,9 @@ import { SettingManager } from '../settings.js';
 import { BoundingBox } from './common.js';
 import {
     AbortTransactionOperation,
-    BeginTransactionOperation, CommitTransactionOperation, ObjClearOperation, RedoOperation,
-    SelectionBoxOperation, SelectionClearOperation, UndoOperation
+    BeginTransactionOperation, ClearTransactionHistoriesOperation,
+    CommitTransactionOperation, ObjAddOperation, ObjClearOperation, objRemoveSelection, RedoOperation,
+    SelectionBoxOperation, SelectionClearOperation, SleepOperation, UndoOperation
 } from './app-operation.js';
 import { Observable, Subject } from '../thirdparty/rxjs.js';
 
@@ -82,8 +83,23 @@ class OpDispatcher {
         this.execute(op);
     }
 
+    clearTransactionHistories() {
+        const op = new ClearTransactionHistoriesOperation(this);
+        this.execute(op);
+    }
+
     clearObjects() {
         const op = new ObjClearOperation(this);
+        this.execute(op);
+    }
+
+    removeSelectedObjects() {
+        const op = new objRemoveSelection(this);
+        this.execute(op);
+    }
+
+    addObjects(items) {
+        const op = new ObjAddOperation(this, items);
         this.execute(op);
     }
 
@@ -96,8 +112,17 @@ class OpDispatcher {
     }
 
     execute(op) {
+        const opTime = Date.now();
+        if (this.m_previousOpFinishTime) {
+            const m = opTime - this.m_previousOpFinishTime;
+            if (m > this.m_settings.ignorableTimeIntervalMs) {
+                const nop = new SleepOperation(this, m);
+                this.m_opSubject.next(nop);
+            }
+        }
         this.m_opSubject.next(op);
         op.apply(this);
+        this.m_previousOpFinishTime = Date.now();
     }
 }
 

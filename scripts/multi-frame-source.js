@@ -1,5 +1,5 @@
 import { BoundingBox } from './core/common.js';
-import { DrawItem } from './core/draw-item.js';
+import { DeserializeDrawItems, DrawItem } from './core/draw-item.js';
 import { Subject } from './thirdparty/rxjs.js';
 import Van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
@@ -134,19 +134,12 @@ class MultiFrameSource {
     async GotoFrame(n) {
         if (n > this.m_totalFrames.rawVal - 1) return;
 
-        const objectList = [];
         const nn = Math.max(Math.min(n, this.m_totalFrames.rawVal - 1), 0);
         if (nn != this.m_currentFrame.rawVal) {
             this.m_currentFrame.val = nn;
         }
         const text = await this.m_loader(this.m_currentFrame.rawVal);
-        const objlist = JSON.parse(text);
-        for (let obj of objlist) {
-            const drawItem = new DrawItem(obj.type)
-            Object.assign(drawItem, obj);
-            objectList.push(drawItem);
-            DrawItem.recursivelySanitize(drawItem);
-        }
+        const objectList = DeserializeDrawItems(text);
         this.m_frameCountSubject.next(n + 1);
         this.m_nextFrameSubject.next(objectList);
     }
