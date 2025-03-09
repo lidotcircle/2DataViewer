@@ -1,4 +1,4 @@
-import { Subject } from "./thirdparty/rxjs.js";
+import { Observable, Subject } from "./thirdparty/rxjs.js";
 
 
 class SettingManager {
@@ -54,6 +54,22 @@ class SettingManager {
         this.setConfig("ignorableTimeIntervalMs", value);
     }
 
+    get showObjectViewer() {
+        return this.getConfig("showObjectViewer");
+    }
+
+    set showObjectViewer(value) {
+        this.setConfig("showObjectViewer", value);
+    }
+
+    get showFilter() {
+        return this.getConfig("showFilter");
+    }
+
+    set showFilter(value) {
+        this.setConfig("showFilter", value);
+    }
+
     get changeObservable() {
         return new Observable(observer => {
             return this.m_changeSubject.subscribe(observer);
@@ -66,7 +82,9 @@ class SettingManager {
             defaultColor: "black",
             defaultLineWidth: 1,
             maxTransactionHistory: 100,
-            ignorableTimeIntervalMs: 100
+            ignorableTimeIntervalMs: 100,
+            showObjectViewer: true,
+            showFilter: true
         };
         this.m_changeSubject.next();
     }

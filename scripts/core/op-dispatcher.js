@@ -19,7 +19,7 @@ class OpDispatcher {
         /** @private */
         this.m_settings = settings;
         /** @private */
-        this.m_objectFilter = new ObjectFilter();
+        this.m_objectFilter = new ObjectFilter(this.m_settings);
         /** @private */
         this.m_objMgr = new ObjectManager(this.m_objectFilter, this.m_settings);
         /** @private */

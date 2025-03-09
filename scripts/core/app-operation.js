@@ -155,7 +155,7 @@ class objRemoveSelection extends AppOperation {
     }
 
     apply() {
-        const selected = this.m_dispatcher.ObjectManager.selectedObjects();
+        const selected = this.m_dispatcher.ObjectManager.selectedObjects;
         const trans = this.m_dispatcher.TransactionManager.beginTransaction();
         trans.RemoveItems(selected);
         trans.commit();

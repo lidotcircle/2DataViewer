@@ -255,6 +255,10 @@ class Application {
         return this.m_opDispatcher;
     }
 
+    get Settings() {
+        return this.m_settingManager;
+    }
+
     get ObjectManager() {
         return this.m_opDispatcher.ObjectManager;
     }

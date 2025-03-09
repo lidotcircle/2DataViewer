@@ -2,6 +2,7 @@ import { Observable, Subject } from '../thirdparty/rxjs.js';
 import van from '../thirdparty/van.js';
 import jss from '../thirdparty/jss.js';
 import { genStyle } from './common.js';
+import { SettingManager } from '../settings.js';
 
 class FilterRule {
     constructor() {
@@ -198,7 +199,8 @@ function deserializeFilterRule(str) {
 }
 
 class ObjectFilter {
-    constructor() {
+    /** @param {SettingManager} settings */
+    constructor(settings) {
         const { classes } = jss.createStyleSheet({
             objectFilter: {
                 position: "absolute",
@@ -315,7 +317,8 @@ class ObjectFilter {
             },
         }).attach();
         this.m_classes = classes;
-        this.m_show = van.state(true);
+        console.log(settings);
+        this.m_show = van.state(settings.showFilter);
         this.m_enabled = van.state(true);
         this.m_filters = [];
         this.m_filterDDs = van.reactive([]);
@@ -323,6 +326,12 @@ class ObjectFilter {
         this.m_layerFilter = new LayerFilter();
         this.m_layerDDs = van.reactive([]);
         this.syncLayerFromLayerFilter();
+
+        settings.changeObservable.subscribe(n => {
+            if (n === "showFilter") {
+                this.m_show.val = settings.showFilter;
+            }
+        });
 
         this.loadFromLocalStorage();
     }

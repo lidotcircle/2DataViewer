@@ -9,22 +9,18 @@ import hotkeys from './thirdparty/hotkeys.js';
   */
 function SetupShortcuts(app, objViewer) {
     const objMgr = app.ObjectManager;
-    const filter = app.ObjectFilter;
     const loader = app.FrameLoader;
-    const transMgr = app.TransactionManager;
     hotkeys('ctrl+i', () => objViewer.toggle());
-    hotkeys('ctrl+m', () => filter.toggleFilterViewer());
+    hotkeys('ctrl+m', () => app.Settings.showFilter = !app.Settings.showFilter);
     hotkeys('del', () => {
         const objs = objMgr.selectedObjects;
         if (objs.length > 0) {
-            const trans = transMgr.beginTransaction();
-            trans.RemoveItems(objs);
-            trans.commit();
-            objMgr.clearSelection();
+            app.OpDispatcher.removeSelectedObjects();
+            app.OpDispatcher.clearSelection();
         }
     });
     hotkeys('escape', () => {
-        objMgr.clearSelection();
+        app.OpDispatcher.clearSelection();
         if (app.CommandLineBar.isShow()) {
             app.CommandLineBar.hide();
         }
