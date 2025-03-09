@@ -256,7 +256,9 @@ if __name__ == "__main__":
             if n.startswith("(base "):
                 baseOffset = off
                 continue
-            frameOffset.append([off, baseOffset])
+            else:
+                frameOffset.append([off, baseOffset])
+
             if (len(frameOffset) > 1):
                 continue
             try:
@@ -281,5 +283,8 @@ if __name__ == "__main__":
             except Exception as e:
                 print(e)
                 pass
+
+    if len(minCoord) == 0 or len(maxCoord) == 0:
+        mergePoint({"x": 0, "y": 0})
 
     run(host=args.host, port=args.port)
