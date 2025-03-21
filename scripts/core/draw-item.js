@@ -1,4 +1,4 @@
-import { AffineTransformation, BoundingBox, PointAdd, PointSub } from './common.js';
+import { AffineTransformation, BoundingBox, HTMLColorStringToRGBAInternal, Perpendicular, PointAdd, PointSub, VecResize } from './common.js';
 import { DrawTextInCanvasAcrossLine } from './canvas-utils.js';
 import { Shape, Point } from '../thirdparty/h2g.js';
 
@@ -395,8 +395,181 @@ class DrawItem {
             }
         }
     }
-}
 
+    /**
+     * WebGL rendering implementation
+     * @param {WebGLRenderingContext} gl 
+     * @param {WebGLProgram} program 
+     */
+    renderingWebGL(gl, program) {
+        switch (this.type) {
+            case 'line':
+                this.renderLineWebGL(gl, program);
+                break;
+            case 'cline':
+                this.renderClineWebGL(gl, program);
+                break;
+            case 'circle':
+                this.renderCircleWebGL(gl, program);
+                break;
+            case 'polygon':
+                this.renderPolygonWebGL(gl, program);
+                break;
+            case 'arc':
+                this.renderArcWebGL(gl, program);
+                break;
+            case 'compound':
+                this.renderCompoundWebGL(gl, program);
+                break;
+        }
+    }
+
+    renderLineWebGL(gl, program) {
+        const vertices = this.generateLineVertices();
+        this.renderGeometry(gl, program, vertices, gl.TRIANGLES);
+    }
+
+    renderClineWebGL(gl, program) {
+        // Render line
+        this.renderLineWebGL(gl, program);
+
+        // Render endpoints
+        this.renderCircleEndpoint(gl, program, this.point1);
+        this.renderCircleEndpoint(gl, program, this.point2);
+    }
+
+    renderCircleEndpoint(gl, program, center) {
+        const prevRadius = this.radius;
+        this.radius = this.width / 2;
+        this.center = center;
+        this.renderCircleWebGL(gl, program);
+        this.radius = prevRadius;
+    }
+
+    generateLineVertices() {
+        const halfWidth = this.width / 2;
+        const dir = PointSub(this.point2, this.point1);
+        const normal = VecResize(Perpendicular(dir), halfWidth);
+
+        return [
+            // First triangle
+            this.point1.x - normal.x, this.point1.y - normal.y,
+            this.point1.x + normal.x, this.point1.y + normal.y,
+            this.point2.x + normal.x, this.point2.y + normal.y,
+
+            // Second triangle
+            this.point1.x - normal.x, this.point1.y - normal.y,
+            this.point2.x + normal.x, this.point2.y + normal.y,
+            this.point2.x - normal.x, this.point2.y - normal.y
+        ];
+    }
+
+    renderCircleWebGL(gl, program) {
+        const vertices = this.generateCircleVertices();
+        this.renderGeometry(gl, program, vertices, gl.TRIANGLE_FAN);
+    }
+
+    generateCircleVertices(segments = 32) {
+        const vertices = [this.center.x, this.center.y];
+        const angleStep = (Math.PI * 2) / segments;
+
+        for (let i = 0; i <= segments; i++) {
+            const angle = i * angleStep;
+            vertices.push(
+                this.center.x + Math.cos(angle) * this.radius,
+                this.center.y + Math.sin(angle) * this.radius
+            );
+        }
+        return vertices;
+    }
+
+    renderPolygonWebGL(gl, program) {
+        const vertices = this.triangulatePolygon();
+        this.renderGeometry(gl, program, vertices, gl.TRIANGLES);
+    }
+
+    triangulatePolygon() {
+        // Simple convex polygon triangulation (fan triangulation)
+        const vertices = [];
+        const first = this.points[0];
+
+        for (let i = 1; i < this.points.length - 1; i++) {
+            vertices.push(
+                first.x, first.y,
+                this.points[i].x, this.points[i].y,
+                this.points[i + 1].x, this.points[i + 1].y
+            );
+        }
+        return vertices;
+    }
+
+    renderArcWebGL(gl, program) {
+        const vertices = this.generateArcVertices();
+        this.renderGeometry(gl, program, vertices, gl.TRIANGLE_STRIP);
+    }
+
+    generateArcVertices(segments = 32) {
+        const startRad = this.startAngle * Math.PI / 180;
+        const endRad = this.endAngle * Math.PI / 180;
+        const angleStep = (endRad - startRad) / segments;
+        const vertices = [];
+        const innerRadius = this.radius - this.width / 2;
+        const outerRadius = this.radius + this.width / 2;
+
+        for (let i = 0; i <= segments; i++) {
+            const angle = startRad + i * angleStep;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+
+            vertices.push(
+                this.center.x + cos * outerRadius,
+                this.center.y + sin * outerRadius,
+                this.center.x + cos * innerRadius,
+                this.center.y + sin * innerRadius
+            );
+        }
+        return vertices;
+    }
+
+    renderCompoundWebGL(gl, program) {
+        this.shapes.forEach(shape => shape.renderingWebGL(gl, program));
+    }
+
+    renderGeometry(gl, program, vertices, drawMode) {
+        if (!vertices.length) return;
+
+        // Set up color
+        const color = this.parseColor(this.color);
+        const colorLocation = gl.getUniformLocation(program, 'u_color');
+        gl.uniform4fv(colorLocation, color);
+
+        // Set up vertex buffer
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+        // Set up attribute
+        const positionLocation = gl.getAttribLocation(program, 'a_position');
+        gl.enableVertexAttribArray(positionLocation);
+        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+        // Draw
+        gl.drawArrays(drawMode, 0, vertices.length / 2);
+
+        // Cleanup
+        gl.deleteBuffer(buffer);
+    }
+
+    parseColor(colorStr) {
+        const { r, g, b, a } = HTMLColorStringToRGBAInternal(colorStr);
+        return new Float32Array([
+            r / 255,
+            g / 255,
+            b / 255,
+            a || 1.0,
+        ]);
+    }
+}
 
 /**
  * @param {DrawItem[]} items

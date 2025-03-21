@@ -212,14 +212,20 @@ function Box2boxTransformation(box1, box2) {
         .concat(new AffineTransformation(1, 0, 0, 1, -c1.x, -c1.y));
 }
 
+const colorMap = new Map();
 function HTMLColorStringToRGBAInternal(color) {
+    if (colorMap.has(color)) {
+        return colorMap.get(color);
+    }
     const div = document.createElement('div');
     div.style.color = color;
     document.body.appendChild(div);
     const colorValue = window.getComputedStyle(div).color;
     document.body.removeChild(div);
     const rgba = colorValue.match(/\d+/g).map(Number);
-    return { r: rgba[0], g: rgba[1], b: rgba[2], a: rgba[3] };
+    const vcolor = { r: rgba[0], g: rgba[1], b: rgba[2], a: rgba[3] };
+    colorMap.set(color, vcolor);
+    return vcolor;
 }
 
 function HTMLColorStringToRGBA(color) {
@@ -449,6 +455,7 @@ export {
     Perpendicular,
     invertColor,
     HTMLColorStringToRGBA,
+    HTMLColorStringToRGBAInternal,
     ColorBlender,
     findLineSegmentIntersection,
     runBeforeNextFrame,

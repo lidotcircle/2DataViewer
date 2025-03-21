@@ -840,6 +840,11 @@ class Viewport {
     }
 
     /** @public */
+    Translate(X, Y) {
+        this.translateInViewport(X, Y);
+    }
+
+    /** @public */
     RotateAround(clockwiseDegree, X, Y) {
         if (X && X.x && X.y) {
             Y = X.y;

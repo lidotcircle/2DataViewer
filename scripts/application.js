@@ -9,6 +9,8 @@ import Van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
 import { CommandLine } from './command-line.js';
 import { OpDispatcher } from './core/op-dispatcher.js';
+import { ViewportWebGL } from './viewportWebGL.js';
+import { ViewportMultiX } from './viewportMultiX.js';
 
 
 class Tool {
@@ -68,8 +70,12 @@ const iconMirrorY = `
 
 class Application {
     constructor() {
+        const viewports = [];
+        viewports.push(new Viewport());
+        // viewports.push(new Viewport());
+        // viewports.push(new ViewportWebGL());
         /** @private */
-        this.m_viewport = new Viewport();
+        this.m_viewport = new ViewportMultiX(viewports);
         /** @private */
         this.m_appEvents = new CursorBox();
         /** @private */
@@ -117,6 +123,20 @@ class Application {
                 overflow: "hidden",
                 outline: "none",
                 position: "relative",
+            },
+            extraViewport: {
+                position: "absolute",
+                width: "20vw",
+                height: "20vh",
+                left: "10vw",
+                top: "10vh",
+                "z-index": 100,
+                "overflow": "hidden",
+                "border-radius": "0.2em",
+                border: "1em red",
+                "border-width": "medium",
+                padding: "0.3em",
+                background: "white",
             },
             dragMode: {
                 cursor: "grabbing",
@@ -178,7 +198,7 @@ class Application {
             this.m_viewport.ScaleDown(pt.x, pt.y);
         });
         this.m_appEvents.dragEventObservable.subscribe((pt) => {
-            this.m_viewport.translateInViewport(pt.x, pt.y);
+            this.m_viewport.Translate(pt.x, pt.y);
             // fullviewport.classList.add('drag-mode');
         });
         this.m_appEvents.selectionEventObservable.subscribe((box) => {
@@ -200,7 +220,7 @@ class Application {
         /** @private */
         this.m_hoverViewportPosition = { x: 0, y: 0 };
         this.m_appEvents.mouseHoverEventObservable.subscribe((pt) => {
-            const realPt = this.m_viewport.viewportCoordToReal(pt);
+            const realPt = this.m_viewport.ViewportCoordToGlobalCoord(pt);
             this.m_hoverRealPosition = realPt;
             this.m_hoverViewportPosition = pt;
             this.m_hoverPositionSubject.next(realPt);
@@ -296,6 +316,10 @@ class Application {
     }
 
     render() {
+        const extraVPs = [];
+        if (this.m_viewport.elements.length > 1) {
+            extraVPs.push(Van.tags.div({ class: this.m_classes.extraViewport }, this.m_viewport.elements[1]));
+        }
         return Van.tags.div({ class: this.m_classes.container },
             () => {
                 return Van.tags.div({ class: this.m_classes.title }, Van.tags.h1("2D Data Viewer"));
@@ -303,11 +327,12 @@ class Application {
             Van.tags.div({ class: this.m_classes.screen },
                 this.m_commandLineBar,
                 this.ObjectFilter,
-                this.m_viewport.element,
+                this.m_viewport.elements[0],
                 this.m_appEvents.element,
             ),
             this.renderTools.bind(this),
             this.m_frameLoader,
+            ...extraVPs,
         );
     }
 };
