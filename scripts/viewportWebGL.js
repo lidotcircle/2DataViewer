@@ -322,7 +322,7 @@ class ViewportWebGL {
             .concat(this.m_transform)
             .convertToDOMMatrix();
 
-        console.log(domMatrix);
+        // console.log(domMatrix);
         // return [
         //     0.01, 0, 0,
         //     0, 0.01, 0,

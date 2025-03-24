@@ -191,21 +191,19 @@ class Viewport {
 
     /** @private */
     updateCanvasCSSMatrix() {
-        const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
-        const ctransform =
-            baseTrans.concat(this.m_canvasTransform.concat(baseTrans.revert()));
         this.m_canvasListElement.style.transform =
-            this.BaseCanvas2ViewportTransform.concat(ctransform)
+            this.transform_V
+                .concat(this.transform_M)
+                .concat(this.m_canvasTransform)
+                .concat(this.transform_M.revert())
                 .convertToCSSMatrix();
     }
 
     /** @private */
     getCanvasDOMMatrixTransform() {
-        const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
-        return baseTrans.concat(this.m_transform)
-            .concat(this.stransform)
+        return this.transform_M
+            .concat(this.m_transform)
+            .concat(this.transform_S)
             .convertToDOMMatrix();
     }
 
@@ -541,11 +539,23 @@ class Viewport {
     }
 
     /** @private */
-    get BaseCanvas2ViewportTransform() {
+    get transform_V() {
         const s = 1 / this.m_baseScaleRatio;
         const deltax = (1 - this.m_baseScaleRatio) * this.viewportWidth / 2;
         const deltay = (1 - this.m_baseScaleRatio) * this.viewportHeight / 2;
         return new AffineTransformation(s, 0, 0, s, deltax, deltay);
+    }
+
+    /** @private */
+    get transform_M() {
+        return new AffineTransformation(
+            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2)
+    }
+
+    /** @private */
+    get transform_S() {
+        return AffineTransformation.scale(
+            this.m_baseScaleRatio, this.m_baseScaleRatio);
     }
 
     /** @private */
@@ -563,33 +573,33 @@ class Viewport {
 
     /** @private */
     viewportCoordToReal(point) {
-        const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.viewportWidth / 2, this.viewportHeight / 2);
-        const transform = baseTrans.concat(this.stransform.revert())
-            .concat(this.qtransform)
-            .concat(this.stransform);
+        console.assert(point.x != null && point.y != null);
+        const transform = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.m_transform)
+            .concat(this.transform_S);
         const ans = transform.revertXY(point);
         return { x: Math.round(ans.x), y: Math.round(ans.y) };
     }
 
     /** @private */
     realCoordToViewport(point) {
-        const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.viewportWidth / 2, this.viewportHeight / 2);
-        const transform = baseTrans.concat(this.stransform.revert())
-            .concat(this.qtransform)
-            .concat(this.stransform);
+        const transform = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.m_transform)
+            .concat(this.transform_S);
         const ans = transform.applyXY(point);
         return { x: Math.round(ans.x), y: Math.round(ans.y) };
     }
 
     /** @private */
     viewportCoordToCanvas(point) {
-        const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
-        const ctransform = this.BaseCanvas2ViewportTransform.concat(baseTrans)
+        const ctransform = this.transform_V
+            .concat(this.transform_M)
             .concat(this.m_canvasTransform)
-            .concat(baseTrans.revert());
+            .concat(this.transform_M.revert());
         return ctransform.revertXY(point);
     }
 
@@ -613,22 +623,6 @@ class Viewport {
             outerbox.containsPoint(c) && outerbox.containsPoint(d) &&
             !innerbox.containsPoint(a) && !innerbox.containsPoint(b) &&
             !innerbox.containsPoint(c) && !innerbox.containsPoint(d);
-    }
-
-    /** @private */
-    get stransform() {
-        return AffineTransformation.scale(
-            this.m_baseScaleRatio, this.m_baseScaleRatio);
-    }
-
-    /** @private */
-    get qtransform() {
-        return this.m_canvasTransform.concat(this.m_transform);
-    }
-
-    /** @private */
-    get qscaleTransform() {
-        return this.qtransform.concat(this.stransform);
     }
 
     /**
@@ -657,8 +651,7 @@ class Viewport {
         const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
         const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
-        this.applyTransformToViewport(
-            translation2.concat(scaling.concat(translation1)));
+        return translation2.concat(scaling.concat(translation1));
     }
 
     /**
@@ -676,7 +669,7 @@ class Viewport {
      * @private
      */
     translateInViewport(X, Y) {
-        this.applyTransformToViewport(AffineTransformation.translate(X, Y));
+        return AffineTransformation.translate(X, Y);
     }
 
     /**
@@ -707,8 +700,7 @@ class Viewport {
         const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
         const rotation = new AffineTransformation(c, s, -s, c, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
-        this.applyTransformToViewport(
-            translation2.concat(rotation.concat(translation1)));
+        return translation2.concat(rotation.concat(translation1));
     }
 
     /**
@@ -719,8 +711,7 @@ class Viewport {
         const translation1 = new AffineTransformation(1, 0, 0, 1, -xVal, 0);
         const scaling = new AffineTransformation(-1, 0, 0, 1, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, xVal, 0);
-        this.applyTransformToViewport(
-            translation2.concat(scaling.concat(translation1)));
+        return translation2.concat(scaling.concat(translation1));
     }
 
     /**
@@ -731,8 +722,7 @@ class Viewport {
         const translation1 = new AffineTransformation(1, 0, 0, 1, 0, -yVal);
         const scaling = new AffineTransformation(1, 0, 0, -1, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, 0, yVal);
-        this.applyTransformToViewport(
-            translation2.concat(scaling.concat(translation1)));
+        return translation2.concat(scaling.concat(translation1));
     }
 
     /**
@@ -740,9 +730,7 @@ class Viewport {
      * @private
      */
     applyTransformToViewport(transform) {
-        const t =
-            this.BaseCanvas2ViewportTransform.concat(new AffineTransformation(
-                1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2));
+        const t = this.transform_V.concat(this.transform_M);
         const tn = t.revert().concat(transform).concat(t);
         this.m_canvasTransform = tn.concat(this.m_canvasTransform);
         this.checkCanvasTransform();
@@ -753,10 +741,46 @@ class Viewport {
      * @private
      */
     applyTransformToReal(transform) {
-        const t = this.qscaleTransform.concat(transform).concat(
-            this.qscaleTransform.revert());
-        this.m_canvasTransform = t.concat(this.m_canvasTransform);
+        const qt = this.m_transform.concat(this.transform_S);
+        this.m_canvasTransform = this.m_canvasTransform
+            .concat(qt).concat(transform).concat(qt.revert());
         this.checkCanvasTransform();
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @returns { AffineTransformation }
+     * @private
+     */
+    TransformOfViewportToTransformOfReal(transform) {
+        const allT = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.m_transform)
+            .concat(this.transform_S);
+        return allT.revert().concat(transform).concat(allT);
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @returns { AffineTransformation }
+     * @private
+     */
+    TransformOfRealToTransformOfViewport(transform) {
+        const allT = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.m_transform)
+            .concat(this.transform_S);
+        return allT.concat(transform).concat(allT.revert());
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @public
+     */
+    ApplyTransformToRealCoord(transform) {
+        this.applyTransformToReal(transform);
     }
 
     /** @public */
@@ -797,74 +821,125 @@ class Viewport {
             { x: -this.viewportWidth / 2, y: -this.viewportHeight / 2 },
             { x: this.viewportWidth / 2, y: this.viewportHeight / 2 });
         this.applyCanvasTransformToTransform();
-        this.m_transform =
-            this.stransform.concat(Box2boxTransformation(box, boxviewport))
-                .concat(this.stransform.revert());
+        this.m_transform = this.transform_S
+            .concat(Box2boxTransformation(box, boxviewport))
+            .concat(this.transform_S.revert());
         this.refreshAllLayers();
     }
     /** @public */
-    ScaleUp(X, Y) {
+    ScaleUpTransform(X, Y) {
         if (X && X.x && X.y) {
             Y = X.y;
             X = X.x;
         }
         X = X || this.viewportCenter.x;
         Y = Y || this.viewportCenter.y;
-        this.scaleInViewport(1.1, 1.1, X, Y);
+        return this.TransformOfViewportToTransformOfReal(
+            this.scaleInViewport(1.1, 1.1, X, Y));
+    }
+    /** @public */
+    ScaleUp(X, Y) {
+        this.ApplyTransformToRealCoord(this.ScaleUpTransform(X, Y));
+    }
+    /** @public */
+    ScaleDownTransform(X, Y) {
+        if (X && X.x && X.y) {
+            Y = X.y;
+            X = X.x;
+        }
+        X = X || this.viewportCenter.x;
+        Y = Y || this.viewportCenter.y;
+        return this.TransformOfViewportToTransformOfReal(
+            this.scaleInViewport(1 / 1.1, 1 / 1.1, X, Y));
     }
     /** @public */
     ScaleDown(X, Y) {
-        if (X && X.x && X.y) {
-            Y = X.y;
-            X = X.x;
-        }
-        X = X || this.viewportCenter.x;
-        Y = Y || this.viewportCenter.y;
-        this.scaleInViewport(1 / 1.1, 1 / 1.1, X, Y);
+        this.ApplyTransformToRealCoord(this.ScaleDownTransform(X, Y));
+    }
+    /** @public */
+    MoveLeftTransform() {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(-50, 0));
     }
     /** @public */
     MoveLeft() {
-        this.translateInViewport(-50, 0);
+        this.ApplyTransformToRealCoord(this.MoveLeftTransform());
+    }
+    /** @public */
+    MoveRightTransform() {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(50, 0));
     }
     /** @public */
     MoveRight() {
-        this.translateInViewport(50, 0);
+        this.ApplyTransformToRealCoord(this.MoveRightTransform());
+    }
+    /** @public */
+    MoveUpTransform() {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(0, -50));
     }
     /** @public */
     MoveUp() {
-        this.translateInViewport(0, -50);
+        this.ApplyTransformToRealCoord(this.MoveUpTransform());
+    }
+    /** @public */
+    MoveDownTransform() {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(0, 50));
     }
     /** @public */
     MoveDown() {
-        this.translateInViewport(0, 50);
+        this.ApplyTransformToRealCoord(this.MoveDownTransform());
     }
 
+    /** @public */
+    TranslateTransform(X, Y) {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(X, Y));
+    }
     /** @public */
     Translate(X, Y) {
-        this.translateInViewport(X, Y);
+        this.ApplyTransformToRealCoord(this.TranslateTransform(X, Y));
     }
 
     /** @public */
-    RotateAround(clockwiseDegree, X, Y) {
+    RotateAroundTransform(clockwiseDegree, X, Y) {
         if (X && X.x && X.y) {
             Y = X.y;
             X = X.x;
         }
         X = X || this.viewportCenter.x;
         Y = Y || this.viewportCenter.y;
-        this.rotateAtToViewport(clockwiseDegree, X, Y);
+        return this.TransformOfViewportToTransformOfReal(
+            this.rotateAtToViewport(clockwiseDegree, X, Y));
+    }
+    /** @public */
+    RotateAround(clockwiseDegree, X, Y) {
+        this.ApplyTransformToRealCoord(this.RotateAroundTransform(clockwiseDegree, X, Y));
     }
 
+
+    /** @public */
+    MirrorXTransform(X) {
+        X = X || this.viewportCenter.x;
+        return this.TransformOfViewportToTransformOfReal(
+            this.flipXAxisToViewport(X));
+    }
     /** @public */
     MirrorX(X) {
-        X = X || this.viewportCenter.x;
-        this.flipXAxisToViewport(X);
+        this.ApplyTransformToRealCoord(this.MirrorXTransform(X));
     }
 
     /** @public */
-    MirrorY(Y) {
+    MirrorYTransform(Y) {
         Y = Y || this.viewportCenter.y;
-        this.flipYAxisToViewport(Y);
+        return this.TransformOfViewportToTransformOfReal(
+            this.flipYAxisToViewport(Y));
+    }
+    /** @public */
+    MirrorY(Y) {
+        this.ApplyTransformToRealCoord(this.MirrorYTransform(Y));
     }
 
     /** @public */

@@ -513,8 +513,9 @@ class DrawItem {
         const endRad = this.endAngle * Math.PI / 180;
         const angleStep = (endRad - startRad) / segments;
         const vertices = [];
-        const innerRadius = this.radius - this.width / 2;
-        const outerRadius = this.radius + this.width / 2;
+        const w = this.width || 1;
+        const innerRadius = this.radius - w / 2;
+        const outerRadius = this.radius + w / 2;
 
         for (let i = 0; i <= segments; i++) {
             const angle = startRad + i * angleStep;

@@ -19,15 +19,30 @@ function Perpendicular(vec) {
     return { x: -vec.y, y: vec.x };
 }
 
+/** @param { number } num */
+function trimSmallNumber(num) {
+    if (num != 0.0 && Math.abs(num) < 1e-10) {
+
+        return 0;
+    }
+    // return parseFloat(num.toFixed(10));
+    return num;
+}
 
 class AffineTransformation {
     constructor(a, b, c, d, tx, ty) {
-        this.a = a || 1;
-        this.b = b || 0;
-        this.c = c || 0;
-        this.d = d || 1;
-        this.tx = tx || 0;
-        this.ty = ty || 0;
+        a = a == null ? 1 : a;
+        b = b == null ? 0 : b;
+        c = c == null ? 0 : c;
+        d = d == null ? 1 : d;
+        tx = tx == null ? 0 : tx;
+        ty = ty == null ? 0 : ty;
+        this.a = trimSmallNumber(a);
+        this.b = trimSmallNumber(b);
+        this.c = trimSmallNumber(c);
+        this.d = trimSmallNumber(d);
+        this.tx = trimSmallNumber(tx);
+        this.ty = trimSmallNumber(ty);
     }
 
     static identity() {
@@ -96,8 +111,8 @@ class AffineTransformation {
         const newB = -this.b * invDet;
         const newC = -this.c * invDet;
         const newD = this.a * invDet;
-        const newTx = (this.c * this.ty - this.d * this.tx) * invDet;
-        const newTy = (this.b * this.tx - this.a * this.ty) * invDet;
+        const newTx = (this.b * this.ty - this.d * this.tx) * invDet;
+        const newTy = (this.c * this.tx - this.a * this.ty) * invDet;
 
         return new AffineTransformation(newA, newB, newC, newD, newTx, newTy);
     }
