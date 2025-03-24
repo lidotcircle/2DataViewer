@@ -45,6 +45,33 @@ class ViewportDrawingLayer {
     }
 };
 
+
+/**
+ *
+ * Transform_V: Canvas(CenterOrigin) to Viewport(CenterOrigin)
+ * Transform_M: Canvas(TopLeftOrigin) to Canvas(CenterOrigin)
+ * m_canvasTransform: changable transformation for CSS transform matrix
+ * m_transform: changable transformation for canvas transform matrix
+ * Transform_S: scaling matrix, it will scale up input data
+ *
+ * realCoord(pt) to viewport: 
+ *     Transform_V * Transform_M * m_canvasTransform * m_transform * Transform_S ( pt )
+ *   |                                               |                             |
+ *   v                                               v                             v
+ * viewport coord                             canvas coord                      real coord 
+ *
+ * size of canvas is larger than viewport 
+ * (width or height of canvas equal respective dimension of viewport times s^2, s is scaling factor).
+ * when applying transform (eg. small moving) to the data,
+ * we can adjust m_canvasTransform to fit the transform if possible instead of redraw canvas.
+ *
+ * CSS matrix = Transform_V * Transform_M * m_canvasTransform * Transform_M^-1
+ * Canvas matrix = Transform_M * m_transform * Transform_S
+ *
+ * Because we want (0, 0) point of real coord maps to center of canvas, 
+ * canvas matrix = Transform_M * (m_transform * Transform_S). 
+ * Here Transform_M will map (0,0) to center of canvas if m_transform is identity transform.
+ */
 class Viewport {
     /**
      * @param {string | null} canvasId
