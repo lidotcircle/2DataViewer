@@ -138,23 +138,12 @@ class ViewportWebGL {
     }
 
     /** @private */
-    get stransform() {
-        return AffineTransformation.scale(
-            this.m_baseScaleRatio, this.m_baseScaleRatio);
+    get transform_S() {
+        return AffineTransformation.scale(this.m_baseScaleRatio, this.m_baseScaleRatio);
     }
 
     /** @private */
-    get qtransform() {
-        return this.m_canvasTransform.concat(this.m_transform);
-    }
-
-    /** @private */
-    get qscaleTransform() {
-        return this.qtransform.concat(this.stransform);
-    }
-
-    /** @private */
-    get BaseCanvas2ViewportTransform() {
+    get transform_V() {
         const s = 1 / this.m_baseScaleRatio;
         const deltax = (1 - this.m_baseScaleRatio) * this.viewportWidth / 2;
         const deltay = (1 - this.m_baseScaleRatio) * this.viewportHeight / 2;
@@ -162,11 +151,18 @@ class ViewportWebGL {
     }
 
     /** @private */
+    get transform_M() {
+        return new AffineTransformation(
+            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2)
+    }
+
+    /** @private */
     updateCanvasCSSMatrix() {
-        this.m_canvasListElement.style.transform =
-            this.BaseCanvas2ViewportTransform
-                .concat(this.m_canvasTransform)
-                .convertToCSSMatrix();
+        this.m_canvasListElement.style.transform = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.transform_M.revert())
+            .convertToCSSMatrix();
     }
 
     /** @private */
@@ -177,11 +173,7 @@ class ViewportWebGL {
 
     /** @private */
     viewportCoordToCanvas(point) {
-        const baseTrans = new AffineTransformation(
-            1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2);
-        const ctransform = this.BaseCanvas2ViewportTransform.concat(baseTrans)
-            .concat(this.m_canvasTransform)
-            .concat(baseTrans.revert());
+        const ctransform = this.transform_V.concat(this.m_canvasTransform);
         return ctransform.revertXY(point);
     }
 
@@ -228,12 +220,61 @@ class ViewportWebGL {
      * @private
      */
     applyTransformToViewport(transform) {
-        const t =
-            this.BaseCanvas2ViewportTransform.concat(new AffineTransformation(
-                1, 0, 0, -1, this.canvasWidth / 2, this.canvasHeight / 2));
-        const tn = t.revert().concat(transform).concat(t);
-        this.m_canvasTransform = tn.concat(this.m_canvasTransform);
+        this.m_canvasTransform = this.transform_V.revert()
+            .concat(transform)
+            .concat(this.transform_V)
+            .concat(this.m_canvasTransform);
         this.checkCanvasTransform();
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @private
+     */
+    applyTransformToReal(transform) {
+        this.m_canvasTransform = this.m_canvasTransform
+            .concat(this.m_transform)
+            .concat(this.transform_S)
+            .concat(transform)
+            .concat(this.transform_S.revert())
+            .concat(this.m_transform.revert());
+        this.checkCanvasTransform();
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @returns { AffineTransformation }
+     * @private
+     */
+    TransformOfViewportToTransformOfReal(transform) {
+        const allT = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.m_transform)
+            .concat(this.transform_S);
+        return allT.revert().concat(transform).concat(allT);
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @returns { AffineTransformation }
+     * @private
+     */
+    TransformOfRealToTransformOfViewport(transform) {
+        const allT = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.m_transform)
+            .concat(this.transform_S);
+        return allT.concat(transform).concat(allT.revert());
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @public
+     */
+    ApplyTransformToRealCoord(transform) {
+        this.applyTransformToReal(transform);
     }
 
     /** @private */
@@ -292,11 +333,6 @@ class ViewportWebGL {
         });
     }
 
-    /** @private */
-    refreshSelection() {
-        // TODO
-    }
-
     refreshLayer(layerInfo) {
         if (!layerInfo.visible || !layerInfo.gl || !layerInfo.program) return;
 
@@ -316,18 +352,11 @@ class ViewportWebGL {
     }
 
     getWebGLMatrix() {
-        const baseTrans = AffineTransformation.scale(2 / this.canvasWidth, 2 / this.canvasHeight);
-        const domMatrix = baseTrans
-            .concat(this.stransform)
+        const domMatrix = AffineTransformation.scale(2 / this.canvasWidth, 2 / this.canvasHeight)
             .concat(this.m_transform)
+            .concat(this.transform_S)
             .convertToDOMMatrix();
 
-        // console.log(domMatrix);
-        // return [
-        //     0.01, 0, 0,
-        //     0, 0.01, 0,
-        //     -0.5, -0.2, 1,
-        // ];
         return [
             domMatrix.a, domMatrix.b, 0,
             domMatrix.c, domMatrix.d, 0,
@@ -335,9 +364,10 @@ class ViewportWebGL {
         ];
     }
 
-    // Existing methods (FitScreen, ScaleUp, etc.) remain mostly unchanged, 
-    // excluding 2D canvas operations and using WebGL equivalents where needed.
-    // Additional helper methods for matrix and WebGL rendering would be included.
+    /** @private */
+    refreshSelection() {
+        // TODO
+    }
 
     /** @private */
     refreshCoordination() {
@@ -349,15 +379,18 @@ class ViewportWebGL {
      * @public
      */
     DrawSelectedItem(items) {
-        // TODO
+        this.m_selectedObjects = items;
+        this.refreshSelection();
     }
 
     /** @public */
     DrawSelectionBox(startInViewport, toInViewport) {
+        // TODO
     }
 
     /** @public */
     clearSelectionBox() {
+        // TODO
     }
 
     /**
@@ -371,8 +404,7 @@ class ViewportWebGL {
         const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
         const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
-        this.applyTransformToViewport(
-            translation2.concat(scaling.concat(translation1)));
+        return translation2.concat(scaling.concat(translation1));
     }
 
     /**
@@ -381,7 +413,7 @@ class ViewportWebGL {
      * @private
      */
     translateInViewport(X, Y) {
-        this.applyTransformToViewport(AffineTransformation.translate(X, Y));
+        return AffineTransformation.translate(X, Y);
     }
 
     /**
@@ -396,8 +428,7 @@ class ViewportWebGL {
         const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
         const rotation = new AffineTransformation(c, s, -s, c, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
-        this.applyTransformToViewport(
-            translation2.concat(rotation.concat(translation1)));
+        return translation2.concat(rotation.concat(translation1));
     }
 
     /**
@@ -408,8 +439,7 @@ class ViewportWebGL {
         const translation1 = new AffineTransformation(1, 0, 0, 1, -xVal, 0);
         const scaling = new AffineTransformation(-1, 0, 0, 1, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, xVal, 0);
-        this.applyTransformToViewport(
-            translation2.concat(scaling.concat(translation1)));
+        return translation2.concat(scaling.concat(translation1));
     }
 
     /**
@@ -420,8 +450,7 @@ class ViewportWebGL {
         const translation1 = new AffineTransformation(1, 0, 0, 1, 0, -yVal);
         const scaling = new AffineTransformation(1, 0, 0, -1, 0, 0);
         const translation2 = new AffineTransformation(1, 0, 0, 1, 0, yVal);
-        this.applyTransformToViewport(
-            translation2.concat(scaling.concat(translation1)));
+        return translation2.concat(scaling.concat(translation1));
     }
 
     /** @public */
@@ -431,8 +460,6 @@ class ViewportWebGL {
         this.refreshAllLayers();
         this.refreshSelection();
     }
-
-    // TODO keep rotation
     /** @public */
     FitScreen() {
         let box = null;
@@ -462,74 +489,81 @@ class ViewportWebGL {
             { x: -this.viewportWidth / 2, y: -this.viewportHeight / 2 },
             { x: this.viewportWidth / 2, y: this.viewportHeight / 2 });
         this.applyCanvasTransformToTransform();
-        this.m_transform =
-            this.stransform.concat(Box2boxTransformation(box, boxviewport))
-                .concat(this.stransform.revert());
+        this.m_transform = this.transform_S
+            .concat(Box2boxTransformation(box, boxviewport))
+            .concat(this.transform_S.revert());
         this.refreshAllLayers();
     }
+
     /** @public */
-    ScaleUp(X, Y) {
+    ScaleUpTransform(X, Y) {
         if (X && X.x && X.y) {
             Y = X.y;
             X = X.x;
         }
         X = X || this.viewportCenter.x;
         Y = Y || this.viewportCenter.y;
-        this.scaleInViewport(1.1, 1.1, X, Y);
+        return this.TransformOfViewportToTransformOfReal(
+            this.scaleInViewport(1.1, 1.1, X, Y));
     }
     /** @public */
-    ScaleDown(X, Y) {
+    ScaleDownTransform(X, Y) {
         if (X && X.x && X.y) {
             Y = X.y;
             X = X.x;
         }
         X = X || this.viewportCenter.x;
         Y = Y || this.viewportCenter.y;
-        this.scaleInViewport(1 / 1.1, 1 / 1.1, X, Y);
+        return this.TransformOfViewportToTransformOfReal(
+            this.scaleInViewport(1 / 1.1, 1 / 1.1, X, Y));
     }
     /** @public */
-    MoveLeft() {
-        this.translateInViewport(-50, 0);
+    MoveLeftTransform() {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(-50, 0));
     }
     /** @public */
-    MoveRight() {
-        this.translateInViewport(50, 0);
+    MoveRightTransform() {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(50, 0));
     }
     /** @public */
-    MoveUp() {
-        this.translateInViewport(0, -50);
+    MoveUpTransform() {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(0, -50));
     }
     /** @public */
-    MoveDown() {
-        this.translateInViewport(0, 50);
+    MoveDownTransform() {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(0, 50));
     }
-
     /** @public */
-    Translate(X, Y) {
-        this.translateInViewport(X, Y);
+    TranslateTransform(X, Y) {
+        return this.TransformOfViewportToTransformOfReal(
+            this.translateInViewport(X, Y));
     }
-
     /** @public */
-    RotateAround(clockwiseDegree, X, Y) {
+    RotateAroundTransform(clockwiseDegree, X, Y) {
         if (X && X.x && X.y) {
             Y = X.y;
             X = X.x;
         }
         X = X || this.viewportCenter.x;
         Y = Y || this.viewportCenter.y;
-        this.rotateAtToViewport(clockwiseDegree, X, Y);
+        return this.TransformOfViewportToTransformOfReal(
+            this.rotateAtToViewport(clockwiseDegree, X, Y));
     }
-
     /** @public */
-    MirrorX(X) {
+    MirrorXTransform(X) {
         X = X || this.viewportCenter.x;
-        this.flipXAxisToViewport(X);
+        return this.TransformOfViewportToTransformOfReal(
+            this.flipXAxisToViewport(X));
     }
-
     /** @public */
-    MirrorY(Y) {
+    MirrorYTransform(Y) {
         Y = Y || this.viewportCenter.y;
-        this.flipYAxisToViewport(Y);
+        return this.TransformOfViewportToTransformOfReal(
+            this.flipYAxisToViewport(Y));
     }
 
     /** @public */

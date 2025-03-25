@@ -29,8 +29,8 @@ class ViewportMultiX {
     }
 
     /** @public */
-    DrawSelectionBox(startInViewport, toInViewport) {
-        this.dispatch("DrawSelectionBox", [startInViewport, toInViewport]);
+    DrawSelectionBox(startInReal, toInReal) {
+        this.dispatch("DrawSelectionBox", [startInReal, toInReal]);
     }
 
     /**
@@ -60,47 +60,57 @@ class ViewportMultiX {
 
     /** @public */
     ScaleUp(X, Y) {
-        this.dispatch("ScaleUp", [X, Y]);
+        const trans = this.m_mainViewport.ScaleUpTransform(X, Y);
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
     /** @public */
     ScaleDown(X, Y) {
-        this.dispatch("ScaleDown", [X, Y]);
+        const trans = this.m_mainViewport.ScaleDownTransform(X, Y);
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
     /** @public */
     MoveLeft() {
-        this.dispatch("MoveLeft", []);
+        const trans = this.m_mainViewport.MoveLeftTransform();
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
     /** @public */
     MoveRight() {
-        this.dispatch("MoveRight", []);
+        const trans = this.m_mainViewport.MoveRightTransform();
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
     /** @public */
     MoveUp() {
-        this.dispatch("MoveUp", []);
+        const trans = this.m_mainViewport.MoveUpTransform();
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
     /** @public */
     MoveDown() {
-        this.dispatch("MoveDown", []);
+        const trans = this.m_mainViewport.MoveDownTransform();
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
 
     /** @public */
     Translate(X, Y) {
-        this.dispatch("Translate", [X, Y]);
+        const trans = this.m_mainViewport.TranslateTransform(X, Y);
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
 
     /** @public */
     RotateAround(clockwiseDegree, X, Y) {
-        this.dispatch("RotateAround", [clockwiseDegree, X, Y]);
+        const trans = this.m_mainViewport.RotateAroundTransform(clockwiseDegree, X, Y);
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
 
     /** @public */
     MirrorX(X) {
-        this.dispatch("MirrorX", [X]);
+        const trans = this.m_mainViewport.MirrorXTransform(X);
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
 
     /** @public */
     MirrorY(Y) {
-        this.dispatch("MirrorY", [Y]);
+        const trans = this.m_mainViewport.MirrorYTransform(Y);
+        this.dispatch("ApplyTransformToRealCoord", [trans]);
     }
 
     /** @public */

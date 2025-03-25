@@ -486,7 +486,9 @@ class Viewport {
     }
 
     /** @public */
-    DrawSelectionBox(startInViewport, toInViewport) {
+    DrawSelectionBox(startInReal, toInReal) {
+        const startInViewport = this.realCoordToViewport(startInReal);
+        const toInViewport = this.realCoordToViewport(toInReal);
         const start = this.viewportCoordToCanvas(startInViewport);
         const to = this.viewportCoordToCanvas(toInViewport);
 
@@ -818,7 +820,6 @@ class Viewport {
         this.refreshSelection();
     }
 
-    // TODO keep rotation
     /** @public */
     FitScreen() {
         let box = null;

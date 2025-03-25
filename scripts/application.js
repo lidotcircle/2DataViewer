@@ -202,9 +202,9 @@ class Application {
             // fullviewport.classList.add('drag-mode');
         });
         this.m_appEvents.selectionEventObservable.subscribe((box) => {
-            this.m_viewport.DrawSelectionBox(box.getBL(), box.getTR());
             const bl = this.m_viewport.ViewportCoordToGlobalCoord(box.getBL());
             const tr = this.m_viewport.ViewportCoordToGlobalCoord(box.getTR());
+            this.m_viewport.DrawSelectionBox(bl, tr);
             const gbox = new BoundingBox(bl, tr);
             this.m_opDispatcher.applySelectionBox(gbox);
             // fullviewport.classList.add('selection-mode');
