@@ -400,49 +400,50 @@ class DrawItem {
      * WebGL rendering implementation
      * @param {WebGLRenderingContext} gl 
      * @param {WebGLProgram} program 
+     * @param {string} override color
      */
-    renderingWebGL(gl, program) {
+    renderingWebGL(gl, program, ocolor = null) {
         switch (this.type) {
             case 'line':
-                this.renderLineWebGL(gl, program);
+                this.renderLineWebGL(gl, program, ocolor);
                 break;
             case 'cline':
-                this.renderClineWebGL(gl, program);
+                this.renderClineWebGL(gl, program, ocolor);
                 break;
             case 'circle':
-                this.renderCircleWebGL(gl, program);
+                this.renderCircleWebGL(gl, program, ocolor);
                 break;
             case 'polygon':
-                this.renderPolygonWebGL(gl, program);
+                this.renderPolygonWebGL(gl, program, ocolor);
                 break;
             case 'arc':
-                this.renderArcWebGL(gl, program);
+                this.renderArcWebGL(gl, program, ocolor);
                 break;
             case 'compound':
-                this.renderCompoundWebGL(gl, program);
+                this.renderCompoundWebGL(gl, program, ocolor);
                 break;
         }
     }
 
-    renderLineWebGL(gl, program) {
+    renderLineWebGL(gl, program, ocolor) {
         const vertices = this.generateLineVertices();
-        DrawItem.renderGeometry(gl, program, vertices, this.color, gl.TRIANGLES);
+        DrawItem.renderGeometry(gl, program, vertices, ocolor || this.color, gl.TRIANGLES);
     }
 
-    renderClineWebGL(gl, program) {
+    renderClineWebGL(gl, program, ocolor) {
         // Render line
-        this.renderLineWebGL(gl, program);
+        this.renderLineWebGL(gl, program, ocolor);
 
         // Render endpoints
-        this.renderCircleEndpoint(gl, program, this.point1);
-        this.renderCircleEndpoint(gl, program, this.point2);
+        this.renderCircleEndpoint(gl, program, this.point1, ocolor);
+        this.renderCircleEndpoint(gl, program, this.point2, ocolor);
     }
 
-    renderCircleEndpoint(gl, program, center) {
+    renderCircleEndpoint(gl, program, center, ocolor) {
         const prevRadius = this.radius;
         this.radius = this.width / 2;
         this.center = center;
-        this.renderCircleWebGL(gl, program);
+        this.renderCircleWebGL(gl, program, ocolor);
         this.radius = prevRadius;
     }
 
@@ -464,9 +465,9 @@ class DrawItem {
         ];
     }
 
-    renderCircleWebGL(gl, program) {
+    renderCircleWebGL(gl, program, ocolor) {
         const vertices = this.generateCircleVertices();
-        DrawItem.renderGeometry(gl, program, vertices, this.color, gl.TRIANGLE_FAN);
+        DrawItem.renderGeometry(gl, program, vertices, ocolor || this.color, gl.TRIANGLE_FAN);
     }
 
     generateCircleVertices(segments = 32) {
@@ -483,9 +484,9 @@ class DrawItem {
         return vertices;
     }
 
-    renderPolygonWebGL(gl, program) {
+    renderPolygonWebGL(gl, program, ocolor) {
         const vertices = DrawItem.triangulateConvexPolygon(this.points);
-        DrawItem.renderGeometry(gl, program, vertices, this.color, gl.TRIANGLES);
+        DrawItem.renderGeometry(gl, program, vertices, ocolor || this.color, gl.TRIANGLES);
     }
 
     /** @param {{x: number, y: number}[]} points */
@@ -504,9 +505,9 @@ class DrawItem {
         return vertices;
     }
 
-    renderArcWebGL(gl, program) {
+    renderArcWebGL(gl, program, ocolor) {
         const vertices = this.generateArcVertices();
-        DrawItem.renderGeometry(gl, program, vertices, this.color, gl.TRIANGLE_STRIP);
+        DrawItem.renderGeometry(gl, program, vertices, ocolor || this.color, gl.TRIANGLE_STRIP);
     }
 
     generateArcVertices(segments = 32) {

@@ -10,7 +10,10 @@ class WebGLLayer {
      */
     constructor(canvasElement) {
         this.m_canvasElement = canvasElement;
-        this.gl = canvasElement.getContext('webgl');
+        this.gl = canvasElement.getContext('webgl2');
+        if (this.gl == null) {
+            this.gl = canvasElement.getContext('webgl');
+        }
         this.program = null;
         if (this.gl) {
             this.program = this.initializeWebGL(this.gl);
@@ -110,6 +113,7 @@ class ViewportWebGL {
          * @private
          */
         this.m_layerList = [];
+        /** @type {DrawItem[]} */
         this.m_selectedObjects = [];
         this.m_errorSubject = new Subject();
 
@@ -401,7 +405,22 @@ class ViewportWebGL {
 
     /** @private */
     refreshSelection() {
-        // TODO
+        const gl = this.m_selectedItemsCanvas.gl;
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        const matrix = this.getWebGLMatrix();
+        gl.useProgram(this.m_selectedItemsCanvas.program);
+        const matrixLocation = gl.getUniformLocation(this.m_selectedItemsCanvas.program, 'u_matrix');
+        gl.uniformMatrix3fv(matrixLocation, false, matrix);
+
+        for (const obj of this.m_selectedObjects) {
+            obj.renderingWebGL(
+                this.m_selectedItemsCanvas.gl,
+                this.m_selectedItemsCanvas.program,
+                this.m_settings.selectedItemColor);
+        }
     }
 
     /** @private */
@@ -420,14 +439,14 @@ class ViewportWebGL {
 
     /** @public */
     DrawSelectionBox(pts) {
-        const gl = this.m_selectedItemsCanvas.gl;
+        const gl = this.m_selectionBox.gl;
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         const matrix = this.getWebGLMatrix();
-        gl.useProgram(this.m_selectedItemsCanvas.program);
-        const matrixLocation = gl.getUniformLocation(this.m_selectedItemsCanvas.program, 'u_matrix');
+        gl.useProgram(this.m_selectionBox.program);
+        const matrixLocation = gl.getUniformLocation(this.m_selectionBox.program, 'u_matrix');
         gl.uniformMatrix3fv(matrixLocation, false, matrix);
 
         const a = this.viewportCoordToGlobal({ x: 0, y: 0 });
@@ -437,17 +456,17 @@ class ViewportWebGL {
         for (let i = 0; i < pts.length; i++) {
             const line = DrawItem.CreateCLine(pts[i], pts[(i + 1) % pts.length], w);
             line.setColor(this.m_settings.selectionBoxBoundaryColor);
-            line.renderingWebGL(gl, this.m_selectedItemsCanvas.program);
+            line.renderingWebGL(gl, this.m_selectionBox.program);
         }
 
         const pg = DrawItem.CreatePolygon(pts);
         pg.setColor(this.m_settings.selectionBoxMainColor);
-        pg.renderingWebGL(gl, this.m_selectedItemsCanvas.program);
+        pg.renderingWebGL(gl, this.m_selectionBox.program);
     }
 
     /** @public */
     clearSelectionBox() {
-        const gl = this.m_selectedItemsCanvas.gl;
+        const gl = this.m_selectionBox.gl;
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);

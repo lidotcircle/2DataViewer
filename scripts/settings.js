@@ -38,6 +38,10 @@ class SettingManager {
         return 'rgba(80, 80, 255, 0.8)';
     }
 
+    get selectedItemColor() {
+        return "rgba(200, 200, 230, 0.3)";
+    }
+
     get defaultLineWidth() {
         return this.getConfig("defaultLineWidth");
     }

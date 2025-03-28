@@ -529,7 +529,7 @@ class Viewport {
     refreshSelection() {
         const ctx = FixedColorCanvasRenderingContext2D(
             this.m_selectedItemsCanvas.getContext('2d'),
-            'rgba(200, 200, 230, 0.3)');
+            this.m_settings.selectedItemColor);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
 
