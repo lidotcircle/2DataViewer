@@ -30,6 +30,14 @@ class SettingManager {
         this.setConfig("defaultColor", value);
     }
 
+    get selectionBoxMainColor() {
+        return 'rgba(93, 93, 255, 0.3)';
+    }
+
+    get selectionBoxBoundaryColor() {
+        return 'rgba(80, 80, 255, 0.8)';
+    }
+
     get defaultLineWidth() {
         return this.getConfig("defaultLineWidth");
     }

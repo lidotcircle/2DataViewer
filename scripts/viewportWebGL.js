@@ -1,17 +1,15 @@
 import { DrawTextInCanvasAcrossLine, FixedColorCanvasRenderingContext2D } from './core/canvas-utils.js';
 import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, Perpendicular, PointAdd, PointSub, runBeforeNextFrame, VecLength, VecResize } from './core/common.js';
+import { DrawItem } from './core/draw-item.js';
+import { SettingManager } from './settings.js';
 import { Observable, Subject } from './thirdparty/rxjs.js';
 
-class ViewportDrawingLayer {
+class WebGLLayer {
     /**
-     * @param {string} layerName
      * @param {HTMLCanvasElement} canvasElement
      */
-    constructor(layerName, canvasElement) {
-        this.m_layerName = layerName;
-        this.m_objectList = [];
+    constructor(canvasElement) {
         this.m_canvasElement = canvasElement;
-        this.m_visible = true;
         this.gl = canvasElement.getContext('webgl');
         this.program = null;
         if (this.gl) {
@@ -61,6 +59,19 @@ class ViewportDrawingLayer {
         }
         return shader;
     }
+}
+
+class ViewportDrawingLayer extends WebGLLayer {
+    /**
+     * @param {string} layerName
+     * @param {HTMLCanvasElement} canvasElement
+     */
+    constructor(layerName, canvasElement) {
+        super(canvasElement);
+        this.m_layerName = layerName;
+        this.m_objectList = [];
+        this.m_visible = true;
+    }
 
     setDrawedItems(items) { this.m_objectList = items; }
     get drawedItems() { return this.m_objectList; }
@@ -71,21 +82,23 @@ class ViewportDrawingLayer {
 }
 
 class ViewportWebGL {
-    constructor(canvasId) {
+    /** @param {SettingManager} settings */
+    constructor(canvasId, settings) {
+        this.m_settings = settings;
         this.m_viewportEl = canvasId ? document.getElementById(canvasId) : document.createElement('div');
         this.m_viewportEl.style.background = '#2c2929';
         this.m_viewportEl.style.width = '100%';
         this.m_viewportEl.style.height = '100%';
-        this.m_selectionBox = this.createCanvas();
-        this.m_selectedItemsCanvas = this.createCanvas();
-        this.m_coordinationBox = this.createCanvas();
-        this.m_floatCoordination = this.createCanvas();
+        this.m_selectionBox = new WebGLLayer(this.createCanvas());
+        this.m_selectedItemsCanvas = new WebGLLayer(this.createCanvas());
+        this.m_coordinationBox = new WebGLLayer(this.createCanvas());
+        this.m_floatCoordination = new WebGLLayer(this.createCanvas());
 
         this.m_canvasListElement = document.createElement('div');
         this.m_canvasListElement.style.position = 'relative';
         this.m_canvasListElement.style.transformOrigin = 'top left';
         [this.m_selectionBox, this.m_selectedItemsCanvas, this.m_coordinationBox, this.m_floatCoordination].forEach(c => {
-            this.m_canvasListElement.appendChild(c);
+            this.m_canvasListElement.appendChild(c.m_canvasElement);
         });
         this.m_viewportEl.appendChild(this.m_canvasListElement);
 
@@ -169,6 +182,28 @@ class ViewportWebGL {
     applyCanvasTransformToTransform() {
         this.m_transform = this.m_canvasTransform.concat(this.m_transform);
         this.m_canvasTransform = AffineTransformation.identity();
+    }
+
+    /** @private */
+    viewportCoordToGlobal(point) {
+        const allT = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.transform_M.revert())
+            .concat(this.m_transform)
+            .concat(this.transform_S);
+        return allT.revertXY(point);
+    }
+
+    /** @private */
+    globalCoordToViewport(point) {
+        const allT = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.transform_M.revert())
+            .concat(this.m_transform)
+            .concat(this.transform_S);
+        return allT.applyXY(point);
     }
 
     /** @private */
@@ -280,14 +315,14 @@ class ViewportWebGL {
     /** @private */
     get canvasList() {
         const ans = [];
-        ans.push(this.m_coordinationBox);
+        ans.push(this.m_coordinationBox.m_canvasElement);
         for (let i = 0; i < this.m_layerList.length; i++) {
             const k = this.m_layerList.length - i - 1;
             ans.push(this.m_layerList[k].canvasElement);
         }
-        ans.push(this.m_selectionBox);
-        ans.push(this.m_selectedItemsCanvas);
-        ans.push(this.m_floatCoordination);
+        ans.push(this.m_selectionBox.m_canvasElement);
+        ans.push(this.m_selectedItemsCanvas.m_canvasElement);
+        ans.push(this.m_floatCoordination.m_canvasElement);
         return ans;
     }
 
@@ -384,13 +419,38 @@ class ViewportWebGL {
     }
 
     /** @public */
-    DrawSelectionBox(startInViewport, toInViewport) {
-        // TODO
+    DrawSelectionBox(pts) {
+        const gl = this.m_selectedItemsCanvas.gl;
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        const matrix = this.getWebGLMatrix();
+        gl.useProgram(this.m_selectedItemsCanvas.program);
+        const matrixLocation = gl.getUniformLocation(this.m_selectedItemsCanvas.program, 'u_matrix');
+        gl.uniformMatrix3fv(matrixLocation, false, matrix);
+
+        const a = this.viewportCoordToGlobal({ x: 0, y: 0 });
+        const b = this.viewportCoordToGlobal({ x: 2, y: 2 });
+        const dx = PointSub(a, b);
+        const w = Math.sqrt(dx.x * dx.x + dx.y * dx.y);
+        for (let i = 0; i < pts.length; i++) {
+            const line = DrawItem.CreateCLine(pts[i], pts[(i + 1) % pts.length], w);
+            line.setColor(this.m_settings.selectionBoxBoundaryColor);
+            line.renderingWebGL(gl, this.m_selectedItemsCanvas.program);
+        }
+
+        const pg = DrawItem.CreatePolygon(pts);
+        pg.setColor(this.m_settings.selectionBoxMainColor);
+        pg.renderingWebGL(gl, this.m_selectedItemsCanvas.program);
     }
 
     /** @public */
     clearSelectionBox() {
-        // TODO
+        const gl = this.m_selectedItemsCanvas.gl;
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
     }
 
     /**

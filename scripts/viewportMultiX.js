@@ -29,8 +29,8 @@ class ViewportMultiX {
     }
 
     /** @public */
-    DrawSelectionBox(startInReal, toInReal) {
-        this.dispatch("DrawSelectionBox", [startInReal, toInReal]);
+    DrawSelectionBox(boxPts) {
+        this.dispatch("DrawSelectionBox", [boxPts]);
     }
 
     /**

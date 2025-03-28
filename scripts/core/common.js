@@ -74,6 +74,30 @@ class AffineTransformation {
         return new AffineTransformation(a, b, c, d, tx, ty);
     }
 
+    /**
+     * @param {{x: number, y: number}[]} points
+     *
+     */
+    applyPoints(points) {
+        const ans = [];
+        for (const pt of points) {
+            ans.push(this.applyXY(pt));
+        }
+        return ans;
+    }
+
+    /**
+     * @param {{x: number, y: number}[]} points
+     *
+     */
+    revertPoints(points) {
+        const ans = [];
+        for (const pt of points) {
+            ans.push(this.revertXY(pt));
+        }
+        return ans;
+    }
+
     applyXY(point) {
         const x = this.a * point.x + this.b * point.y + this.tx;
         const y = this.c * point.x + this.d * point.y + this.ty;
@@ -120,6 +144,14 @@ class AffineTransformation {
     convertToDOMMatrix() {
         return new DOMMatrix(
             [this.a, this.b, this.c, this.d, this.tx, this.ty]);
+    }
+
+    convertToWebGLMatrix() {
+        return [
+            this.a, this.b, 0,
+            this.c, this.d, 0,
+            this.e, this.f, 1
+        ];
     }
 
     convertToCSSMatrix() {
@@ -209,6 +241,8 @@ class BoundingBox {
     getTR() {
         return { x: this.maxX, y: this.maxY };
     }
+
+    points() { return [this.getBL(), this.getBR(), this.getTR(), this.getTL()]; }
 }
 
 function text2htmlElement(text) {
@@ -237,7 +271,7 @@ function HTMLColorStringToRGBAInternal(color) {
     document.body.appendChild(div);
     const colorValue = window.getComputedStyle(div).color;
     document.body.removeChild(div);
-    const rgba = colorValue.match(/\d+/g).map(Number);
+    const rgba = colorValue.match(/\d+(\.\d+)?/g).map(Number);
     const vcolor = { r: rgba[0], g: rgba[1], b: rgba[2], a: rgba[3] };
     colorMap.set(color, vcolor);
     return vcolor;

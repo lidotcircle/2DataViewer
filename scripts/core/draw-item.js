@@ -426,7 +426,7 @@ class DrawItem {
 
     renderLineWebGL(gl, program) {
         const vertices = this.generateLineVertices();
-        this.renderGeometry(gl, program, vertices, gl.TRIANGLES);
+        DrawItem.renderGeometry(gl, program, vertices, this.color, gl.TRIANGLES);
     }
 
     renderClineWebGL(gl, program) {
@@ -466,7 +466,7 @@ class DrawItem {
 
     renderCircleWebGL(gl, program) {
         const vertices = this.generateCircleVertices();
-        this.renderGeometry(gl, program, vertices, gl.TRIANGLE_FAN);
+        DrawItem.renderGeometry(gl, program, vertices, this.color, gl.TRIANGLE_FAN);
     }
 
     generateCircleVertices(segments = 32) {
@@ -484,20 +484,21 @@ class DrawItem {
     }
 
     renderPolygonWebGL(gl, program) {
-        const vertices = this.triangulatePolygon();
-        this.renderGeometry(gl, program, vertices, gl.TRIANGLES);
+        const vertices = DrawItem.triangulateConvexPolygon(this.points);
+        DrawItem.renderGeometry(gl, program, vertices, this.color, gl.TRIANGLES);
     }
 
-    triangulatePolygon() {
+    /** @param {{x: number, y: number}[]} points */
+    static triangulateConvexPolygon(points) {
         // Simple convex polygon triangulation (fan triangulation)
         const vertices = [];
-        const first = this.points[0];
+        const first = points[0];
 
-        for (let i = 1; i < this.points.length - 1; i++) {
+        for (let i = 1; i < points.length - 1; i++) {
             vertices.push(
                 first.x, first.y,
-                this.points[i].x, this.points[i].y,
-                this.points[i + 1].x, this.points[i + 1].y
+                points[i].x, points[i].y,
+                points[i + 1].x, points[i + 1].y
             );
         }
         return vertices;
@@ -505,7 +506,7 @@ class DrawItem {
 
     renderArcWebGL(gl, program) {
         const vertices = this.generateArcVertices();
-        this.renderGeometry(gl, program, vertices, gl.TRIANGLE_STRIP);
+        DrawItem.renderGeometry(gl, program, vertices, this.color, gl.TRIANGLE_STRIP);
     }
 
     generateArcVertices(segments = 32) {
@@ -536,11 +537,11 @@ class DrawItem {
         this.shapes.forEach(shape => shape.renderingWebGL(gl, program));
     }
 
-    renderGeometry(gl, program, vertices, drawMode) {
+    static renderGeometry(gl, program, vertices, xcolor, drawMode) {
         if (!vertices.length) return;
 
         // Set up color
-        const color = this.parseColor(this.color);
+        const color = DrawItem.parseColor(xcolor);
         const colorLocation = gl.getUniformLocation(program, 'u_color');
         gl.uniform4fv(colorLocation, color);
 
@@ -561,13 +562,14 @@ class DrawItem {
         gl.deleteBuffer(buffer);
     }
 
-    parseColor(colorStr) {
+    static parseColor(colorStr) {
         const { r, g, b, a } = HTMLColorStringToRGBAInternal(colorStr);
+        const alpha = a == null ? 1.0 : Math.max(Math.min(a, 1), 0);
         return new Float32Array([
             r / 255,
             g / 255,
             b / 255,
-            a || 1.0,
+            alpha
         ]);
     }
 }

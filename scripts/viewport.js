@@ -1,5 +1,6 @@
 import { DrawTextInCanvasAcrossLine, FixedColorCanvasRenderingContext2D } from './core/canvas-utils.js';
 import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, Perpendicular, PointAdd, PointSub, runBeforeNextFrame, VecLength, VecResize } from './core/common.js';
+import { SettingManager } from './settings.js';
 import { Observable, Subject } from './thirdparty/rxjs.js';
 
 
@@ -75,8 +76,9 @@ class ViewportDrawingLayer {
 class Viewport {
     /**
      * @param {string | null} canvasId
+     * @param {SettingManager} settings
      */
-    constructor(canvasId) {
+    constructor(canvasId, settings) {
         /**
          * @type HTMLDivElement
          * @private
@@ -86,6 +88,7 @@ class Viewport {
         this.m_viewportEl.style.width = '100%';
         this.m_viewportEl.style.height = '100%';
         this.m_viewportEl.style.background = '#2c2929';
+        this.m_settings = settings;
 
         while (this.m_viewportEl.lastChild) {
             this.m_viewportEl.removeChild(this.m_viewportEl.lastChild);
@@ -486,29 +489,29 @@ class Viewport {
     }
 
     /** @public */
-    DrawSelectionBox(startInReal, toInReal) {
-        const startInViewport = this.realCoordToViewport(startInReal);
-        const toInViewport = this.realCoordToViewport(toInReal);
-        const start = this.viewportCoordToCanvas(startInViewport);
-        const to = this.viewportCoordToCanvas(toInViewport);
+    DrawSelectionBox(boxPtsInReal) {
+        const canvasPts = [];
+        for (const pt of boxPtsInReal) {
+            canvasPts.push(this.viewportCoordToCanvas(this.realCoordToViewport(pt)));
+        }
 
         let ctx = this.m_selectionBox.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-        ctx.fillStyle = 'rgba(93, 93, 255, 0.3)';
-        const width = Math.abs(to.x - start.x);
-        const height = Math.abs(to.y - start.y);
-        const minX = Math.min(start.x, to.x);
-        const minY = Math.min(start.y, to.y)
-        ctx.fillRect(minX, minY, width, height);
+        ctx.fillStyle = this.m_settings.selectionBoxMainColor;
+        const xpath = new Path2D();
+        for (let p of canvasPts) {
+            xpath.lineTo(p.x, p.y);
+        }
+        xpath.closePath();
+        ctx.fill(xpath);
 
-        ctx.strokeStyle = 'rgba(80, 80, 255, 0.8)';
+        ctx.strokeStyle = this.m_settings.selectionBoxBoundaryColor;
         ctx.lineWidth = 2;
         const path = new Path2D();
-        path.lineTo(start.x, start.y);
-        path.lineTo(start.x, to.y);
-        path.lineTo(to.x, to.y);
-        path.lineTo(to.x, start.y);
+        for (let p of canvasPts) {
+            path.lineTo(p.x, p.y);
+        }
         path.closePath();
         ctx.stroke(path);
     }

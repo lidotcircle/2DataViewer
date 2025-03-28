@@ -70,10 +70,13 @@ const iconMirrorY = `
 
 class Application {
     constructor() {
+        /** @private */
+        this.m_settingManager = new SettingManager();
+
         const viewports = [];
-        viewports.push(new Viewport());
+        viewports.push(new Viewport(null, this.m_settingManager));
         // viewports.push(new Viewport());
-        // viewports.push(new ViewportWebGL());
+        viewports.push(new ViewportWebGL(null, this.m_settingManager));
         /** @private */
         this.m_viewport = new ViewportMultiX(viewports);
         /** @private */
@@ -181,8 +184,6 @@ class Application {
         this.m_classes = classes;
 
         /** @private */
-        this.m_settingManager = new SettingManager();
-        /** @private */
         this.m_opDispatcher = new OpDispatcher(this.m_settingManager);
 
         /** @private */
@@ -204,7 +205,11 @@ class Application {
         this.m_appEvents.selectionEventObservable.subscribe((box) => {
             const bl = this.m_viewport.ViewportCoordToGlobalCoord(box.getBL());
             const tr = this.m_viewport.ViewportCoordToGlobalCoord(box.getTR());
-            this.m_viewport.DrawSelectionBox(bl, tr);
+            const boxPtsInGlobal = [];
+            for (const pt of box.points()) {
+                boxPtsInGlobal.push(this.m_viewport.ViewportCoordToGlobalCoord(pt));
+            }
+            this.m_viewport.DrawSelectionBox(boxPtsInGlobal);
             const gbox = new BoundingBox(bl, tr);
             this.m_opDispatcher.applySelectionBox(gbox);
             // fullviewport.classList.add('selection-mode');
