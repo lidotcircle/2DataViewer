@@ -47,7 +47,7 @@ function SplitString(input) {
                 }
             }
         } else {
-            if (char === ' ') {
+            if (char === ' ' || char === '\t' || char === '\n') {
                 if (currentToken !== '') {
                     tokens.push(currentToken);
                     currentToken = '';
@@ -86,6 +86,14 @@ function SplitString(input) {
 
     if (currentToken !== '') {
         tokens.push(currentToken);
+    }
+
+    if (stack.length > 0 && stack[stack.length - 1].type == "quote") {
+        throw "Unmatched quote";
+    }
+
+    if (currentBracketContext) {
+        throw "Unmatched bracket";
     }
 
     return tokens.filter(t => t !== '');
