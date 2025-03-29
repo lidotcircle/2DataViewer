@@ -175,11 +175,12 @@ class ViewportWebGL {
 
     /** @private */
     updateCanvasCSSMatrix() {
-        this.m_canvasListElement.style.transform = this.transform_V
-            .concat(this.transform_M)
-            .concat(this.m_canvasTransform)
-            .concat(this.transform_M.revert())
-            .convertToCSSMatrix();
+        this.m_canvasListElement.style.transform =
+            this.transform_V
+                .concat(this.transform_M)
+                .concat(this.m_canvasTransform)
+                .concat(this.transform_M.revert())
+                .convertToCSSMatrix();
     }
 
     /** @private */
@@ -193,7 +194,6 @@ class ViewportWebGL {
         const allT = this.transform_V
             .concat(this.transform_M)
             .concat(this.m_canvasTransform)
-            .concat(this.transform_M.revert())
             .concat(this.m_transform)
             .concat(this.transform_S);
         return allT.revertXY(point);
@@ -204,7 +204,6 @@ class ViewportWebGL {
         const allT = this.transform_V
             .concat(this.transform_M)
             .concat(this.m_canvasTransform)
-            .concat(this.transform_M.revert())
             .concat(this.m_transform)
             .concat(this.transform_S);
         return allT.applyXY(point);
@@ -316,6 +315,11 @@ class ViewportWebGL {
         this.applyTransformToReal(transform);
     }
 
+    /** @public */
+    ViewportCoordToGlobalCoord(pt) {
+        return this.viewportCoordToGlobal(pt);
+    }
+
     /** @private */
     get canvasList() {
         const ans = [];
@@ -391,16 +395,13 @@ class ViewportWebGL {
     }
 
     getWebGLMatrix() {
-        const domMatrix = AffineTransformation.scale(2 / this.canvasWidth, 2 / this.canvasHeight)
-            .concat(this.m_transform)
-            .concat(this.transform_S)
-            .convertToDOMMatrix();
-
-        return [
-            domMatrix.a, domMatrix.b, 0,
-            domMatrix.c, domMatrix.d, 0,
-            domMatrix.e, domMatrix.f, 1
-        ];
+        const xtrans = AffineTransformation.scale(2 / this.canvasWidth, 2 / this.canvasHeight);
+        const T = this.m_transform.concat(this.transform_S);
+        const TL = T.linearComponent();
+        const TC = T.concat(TL.revert());
+        const off = xtrans.applyXY({ x: TC.tx, y: TC.ty });
+        const M = AffineTransformation.translate(off.x, off.y);
+        return M.concat(TL).concat(xtrans).convertToWebGLMatrix();
     }
 
     /** @private */
@@ -729,6 +730,10 @@ class ViewportWebGL {
             ans.push(layerInfo.layerName);
         }
         return ans;
+    }
+
+    get viewportCenter() {
+        return { x: this.viewportWidth / 2, y: this.viewportHeight / 2 };
     }
 
     get element() { return this.m_viewportEl; }

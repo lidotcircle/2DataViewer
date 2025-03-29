@@ -63,6 +63,10 @@ class AffineTransformation {
         return new AffineTransformation(sx, 0, 0, sy, 0, 0);
     }
 
+    linearComponent() {
+        return new AffineTransformation(this.a, this.b, this.c, this.d, 0, 0);
+    }
+
     concat(other) {
         const a = this.a * other.a + this.b * other.c;
         const b = this.a * other.b + this.b * other.d;
@@ -150,7 +154,7 @@ class AffineTransformation {
         return [
             this.a, this.b, 0,
             this.c, this.d, 0,
-            this.e, this.f, 1
+            this.tx, this.ty, 1
         ];
     }
 
