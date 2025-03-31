@@ -174,18 +174,27 @@ class ViewportWebGL {
     }
 
     /** @private */
+    get transform_K() {
+        if (this.canvasWidth == 0) {
+            return AffineTransformation.identity();
+        }
+        return AffineTransformation.scale(2 / this.canvasWidth, 2 / this.canvasHeight);
+    }
+
+    /** @private */
     updateCanvasCSSMatrix() {
         this.m_canvasListElement.style.transform =
             this.transform_V
-                .concat(this.transform_M)
                 .concat(this.m_canvasTransform)
-                .concat(this.transform_M.revert())
                 .convertToCSSMatrix();
     }
 
     /** @private */
     applyCanvasTransformToTransform() {
-        this.m_transform = this.m_canvasTransform.concat(this.m_transform);
+        this.m_transform = this.transform_M.revert()
+            .concat(this.m_canvasTransform)
+            .concat(this.transform_M)
+            .concat(this.m_transform);
         this.m_canvasTransform = AffineTransformation.identity();
     }
 
@@ -271,11 +280,13 @@ class ViewportWebGL {
      */
     applyTransformToReal(transform) {
         this.m_canvasTransform = this.m_canvasTransform
+            .concat(this.transform_M)
             .concat(this.m_transform)
             .concat(this.transform_S)
             .concat(transform)
             .concat(this.transform_S.revert())
-            .concat(this.m_transform.revert());
+            .concat(this.m_transform.revert())
+            .concat(this.transform_M.revert());
         this.checkCanvasTransform();
     }
 
@@ -395,13 +406,10 @@ class ViewportWebGL {
     }
 
     getWebGLMatrix() {
-        const xtrans = AffineTransformation.scale(2 / this.canvasWidth, 2 / this.canvasHeight);
-        const T = this.m_transform.concat(this.transform_S);
-        const TL = T.linearComponent();
-        const TC = T.concat(TL.revert());
-        const off = xtrans.applyXY({ x: TC.tx, y: TC.ty });
-        const M = AffineTransformation.translate(off.x, off.y);
-        return M.concat(TL).concat(xtrans).convertToWebGLMatrix();
+        return this.transform_K
+            .concat(this.m_transform)
+            .concat(this.transform_S)
+            .convertToWebGLMatrix();
     }
 
     /** @private */

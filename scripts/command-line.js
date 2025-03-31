@@ -2,6 +2,7 @@ import { DrawItem } from './core/draw-item.js';
 import van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
 import { Application } from './application.js';
+import { SplitString } from './core/str-utils.js';
 
 
 function splitString(input) {
@@ -136,6 +137,10 @@ class CommandLine {
         this.m_show.val = false;
     }
 
+    cmdApplyTransform(trans) {
+        this.m_application.m_viewport.ApplyTransformToRealCoord(trans);
+    }
+
     /** @private */
     cmdZoom() {
         this.m_viewport.FitScreen();
@@ -217,6 +222,47 @@ class CommandLine {
         }
     }
 
+    /** 
+     * @private 
+     * @param {string[]} args
+     */
+    cmdViewportCmd(args) {
+        if (args.length == 0) {
+            this.showError("invalid viewport command");
+            return;
+        }
+
+        const c = args[0];
+        args.shift();
+        if (c === 'rotate') {
+            this.cmdRotate(args[0]);
+        } else if (c === 'fit') {
+            this.m_application.m_viewport.FitScreen();
+        } else if (c === 'reset') {
+            this.m_application.m_viewport.Reset();
+        } else if (c === 'translate') {
+            const deltaX = parseFloat(args[0]);
+            const deltaY = parseFloat(args[1]);
+            if(isNaN(deltaX) || isNaN(deltaY)) {
+                this.showError("invalid translation");
+            } else {
+                this.m_application.m_viewport.Translate(deltaX, deltaY);
+            }
+        } else {
+            this.showError("invalid command");
+        }
+    }
+
+    /** @private */
+    cmdRotate(angleStr) {
+        const angle = parseFloat(angleStr);
+        if (isNaN(angle)) {
+            this.showError('invalid angle for rotate command');
+            return;
+        }
+        this.m_application.m_viewport.RotateAround(angle);
+    }
+
     /** @private */
     evalCommand(cmd) {
         try {
@@ -235,7 +281,12 @@ class CommandLine {
 
     /** @public */
     ExecuteCommand(cmd) {
-        const c = cmd.split(' ')[0];
+        const tokens = SplitString(cmd);
+        if (tokens.length == 0) {
+            this.showError("invalid command");
+        }
+        const c = tokens[0];
+        tokens.shift();
         if (c === 'draw') {
             this.cmdDraw(cmd.substr(5));
         } else if (c === 'undo') {
@@ -248,6 +299,8 @@ class CommandLine {
             this.cmdZoom();
         } else if (c === 'set') {
             this.cmdSet(cmd.substr(4));
+        } else if (c === 'viewport' || c === 'vp') {
+            this.cmdViewportCmd(tokens);
         } else {
             this.showError(`cann't not execute '${cmd}'`);
         }

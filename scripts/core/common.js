@@ -159,7 +159,7 @@ class AffineTransformation {
     }
 
     convertToCSSMatrix() {
-        return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.tx}, ${this.ty})`;
+        return `matrix(${this.a}, ${this.c}, ${this.b}, ${this.d}, ${this.tx}, ${this.ty})`;
     }
 }
 

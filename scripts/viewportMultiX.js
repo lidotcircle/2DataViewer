@@ -33,6 +33,11 @@ class ViewportMultiX {
         this.dispatch("DrawSelectionBox", [boxPts]);
     }
 
+    /** @public */
+    ApplyTransformToRealCoord(transform) {
+        this.dispatch("ApplyTransformToRealCoord", [transform]);
+    }
+
     /**
      * @param {any[]} items
      * @public
