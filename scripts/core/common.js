@@ -152,8 +152,8 @@ class AffineTransformation {
 
     convertToWebGLMatrix() {
         return [
-            this.a, this.b, 0,
-            this.c, this.d, 0,
+            this.a, this.c, 0,
+            this.b, this.d, 0,
             this.tx, this.ty, 1
         ];
     }

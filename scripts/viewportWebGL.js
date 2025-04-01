@@ -184,43 +184,44 @@ class ViewportWebGL {
     /** @private */
     updateCanvasCSSMatrix() {
         this.m_canvasListElement.style.transform =
-            this.transform_V
-                .concat(this.m_canvasTransform)
+            this.m_canvasTransform.concat(this.transform_V)
                 .convertToCSSMatrix();
     }
 
     /** @private */
     applyCanvasTransformToTransform() {
-        this.m_transform = this.transform_M.revert()
+        const TVtoS =
+            this.transform_V.concat(this.transform_M).concat(this.transform_S);
+        this.m_transform = TVtoS.revert()
             .concat(this.m_canvasTransform)
-            .concat(this.transform_M)
+            .concat(TVtoS)
             .concat(this.m_transform);
         this.m_canvasTransform = AffineTransformation.identity();
     }
 
     /** @private */
-    viewportCoordToGlobal(point) {
-        const allT = this.transform_V
+    get RealToViewportTransform() {
+        const allT = this.m_canvasTransform
+            .concat(this.transform_V)
             .concat(this.transform_M)
-            .concat(this.m_canvasTransform)
-            .concat(this.m_transform)
-            .concat(this.transform_S);
-        return allT.revertXY(point);
+            .concat(this.transform_S)
+            .concat(this.m_transform);
+        return allT;
+    }
+
+    /** @private */
+    viewportCoordToGlobal(point) {
+        return this.RealToViewportTransform.revertXY(point);
     }
 
     /** @private */
     globalCoordToViewport(point) {
-        const allT = this.transform_V
-            .concat(this.transform_M)
-            .concat(this.m_canvasTransform)
-            .concat(this.m_transform)
-            .concat(this.transform_S);
-        return allT.applyXY(point);
+        return this.RealToViewportTransform.applyXY(point);
     }
 
     /** @private */
     viewportCoordToCanvas(point) {
-        const ctransform = this.transform_V.concat(this.m_canvasTransform);
+        const ctransform = this.m_canvasTransform.concat(this.transform_V);
         return ctransform.revertXY(point);
     }
 
@@ -267,10 +268,7 @@ class ViewportWebGL {
      * @private
      */
     applyTransformToViewport(transform) {
-        this.m_canvasTransform = this.transform_V.revert()
-            .concat(transform)
-            .concat(this.transform_V)
-            .concat(this.m_canvasTransform);
+        this.m_canvasTransform = transform.concat(this.m_canvasTransform);
         this.checkCanvasTransform();
     }
 
@@ -279,14 +277,15 @@ class ViewportWebGL {
      * @private
      */
     applyTransformToReal(transform) {
-        this.m_canvasTransform = this.m_canvasTransform
+        const TVtoT = this.transform_V
             .concat(this.transform_M)
-            .concat(this.m_transform)
             .concat(this.transform_S)
-            .concat(transform)
-            .concat(this.transform_S.revert())
-            .concat(this.m_transform.revert())
-            .concat(this.transform_M.revert());
+            .concat(this.m_transform);
+        this.m_canvasTransform =
+            this.m_canvasTransform
+                .concat(TVtoT)
+                .concat(transform)
+                .concat(TVtoT.revert());
         this.checkCanvasTransform();
     }
 
@@ -296,12 +295,9 @@ class ViewportWebGL {
      * @private
      */
     TransformOfViewportToTransformOfReal(transform) {
-        const allT = this.transform_V
-            .concat(this.transform_M)
-            .concat(this.m_canvasTransform)
-            .concat(this.m_transform)
-            .concat(this.transform_S);
-        return allT.revert().concat(transform).concat(allT);
+        return this.RealToViewportTransform.revert()
+            .concat(transform)
+            .concat(this.RealToViewportTransform);
     }
 
     /**
@@ -310,12 +306,9 @@ class ViewportWebGL {
      * @private
      */
     TransformOfRealToTransformOfViewport(transform) {
-        const allT = this.transform_V
-            .concat(this.transform_M)
-            .concat(this.m_canvasTransform)
-            .concat(this.m_transform)
-            .concat(this.transform_S);
-        return allT.concat(transform).concat(allT.revert());
+        return this.RealToViewportTransform
+            .concat(transform)
+            .concat(this.RealToViewportTransform.revert());
     }
 
     /**
@@ -407,8 +400,8 @@ class ViewportWebGL {
 
     getWebGLMatrix() {
         return this.transform_K
-            .concat(this.m_transform)
             .concat(this.transform_S)
+            .concat(this.m_transform)
             .convertToWebGLMatrix();
     }
 
