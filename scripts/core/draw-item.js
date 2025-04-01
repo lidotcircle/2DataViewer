@@ -534,8 +534,8 @@ class DrawItem {
         return vertices;
     }
 
-    renderCompoundWebGL(gl, program) {
-        this.shapes.forEach(shape => shape.renderingWebGL(gl, program));
+    renderCompoundWebGL(gl, program, ocolor) {
+        this.shapes.forEach(shape => shape.renderingWebGL(gl, program, ocolor));
     }
 
     static renderGeometry(gl, program, vertices, xcolor, drawMode) {
