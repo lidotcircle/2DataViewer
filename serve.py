@@ -117,34 +117,6 @@ def parse_tokens(tokens):
         return []
 
 
-def serialize_shape(shape):
-    serialized = f'({shape["type"]}'
-    if shape["type"] == "polygon":
-        for point in shape["points"]:
-            serialized += f' (point {point["x"]} {point["y"]})'
-    else:
-        if "point1" in shape:  # For lines
-            serialized += f' (point {shape["point1"]["x"]} {shape["point1"]["y"]})'
-            serialized += f' (point {shape["point2"]["x"]} {shape["point2"]["y"]})'
-        if "center" in shape:  # For circles
-            serialized += f' (center {shape["center"]["x"]} {shape["center"]["y"]})'
-            serialized += f' (radius {shape["radius"]})'
-    if "width" in shape:  # For lines with width
-        serialized += f' (width {shape["width"]})'
-    if "color" in shape:  # Color for any shape
-        serialized += f' (color "{shape["color"]}")'
-    serialized += ')'
-    return serialized
-
-
-def serialize_shapes(shapes):
-    serialized = "(scene\n"
-    for shape in shapes:
-        serialized += "  " + serialize_shape(shape) + "\n"
-    serialized += ")"
-    return serialized
-
-
 @get("/")
 def getroot():
     return static_file("index.html", root="./")

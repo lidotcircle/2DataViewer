@@ -3,6 +3,7 @@ import { DeserializeDrawItems, DrawItem } from './core/draw-item.js';
 import { Subject } from './thirdparty/rxjs.js';
 import Van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
+import { parseTokens, tokenize } from './shape-parser.js';
 
 
 class MultiFrameSource {
@@ -80,9 +81,49 @@ class MultiFrameSource {
     }
 
     /** @private */
+    async useTestData() {
+        const INFOAPI = location.protocol + '//' + location.host + '/testdata.txt';
+        const resp = await fetch(INFOAPI);
+        if (resp.ok) {
+            const text = await resp.text();
+            const lines = text.split('\n').filter(str => str.length > 0);
+            const frames = [];
+            let base = [];
+            for (const line of lines) {
+                const tokens = tokenize(line);
+                const shapes = parseTokens(tokens);
+                if (line.trim().startsWith("(base")) {
+                    // )
+                    base = shapes;
+                } else {
+                    for (const b of base) {
+                        shapes.push(b);
+                    }
+                    frames.push(shapes);
+                }
+            }
+
+            this.m_box = new BoundingBox({ x: 0, y: 0 }, { x: 200, y: 200 });
+            this.m_totalFrames.val = frames.length;
+            this.m_loader = async (n) => {
+                if (n >= frames.length) {
+                    return JSON.stringify([]);;
+                }
+
+                return JSON.stringify(frames[n]);
+            };
+            this.GotoFrame(0);
+        }
+    }
+
+    /** @private */
     async setupConnection() {
         const INFOAPI = location.protocol + '//' + location.host + '/data-info';
         const resp = await fetch(INFOAPI);
+        if (!resp.ok) {
+            this.useTestData();
+            return
+        }
         const data = await resp.json();
         let box = null;
         let nframes = 0;
