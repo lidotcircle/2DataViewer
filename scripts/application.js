@@ -203,11 +203,11 @@ class Application {
             // fullviewport.classList.add('drag-mode');
         });
         this.m_appEvents.selectionEventObservable.subscribe((box) => {
-            const bl = this.m_viewport.ViewportCoordToGlobalCoord(box.getBL());
-            const tr = this.m_viewport.ViewportCoordToGlobalCoord(box.getTR());
+            const bl = this.m_viewport.ViewportCoordToGlobal(box.getBL());
+            const tr = this.m_viewport.ViewportCoordToGlobal(box.getTR());
             const boxPtsInGlobal = [];
             for (const pt of box.points()) {
-                boxPtsInGlobal.push(this.m_viewport.ViewportCoordToGlobalCoord(pt));
+                boxPtsInGlobal.push(this.m_viewport.ViewportCoordToGlobal(pt));
             }
             this.m_viewport.DrawSelectionBox(boxPtsInGlobal);
             const gbox = new BoundingBox(bl, tr);
@@ -215,7 +215,7 @@ class Application {
             // fullviewport.classList.add('selection-mode');
         });
         this.m_appEvents.selectionBoxClearEventObservable.subscribe(() => {
-            this.m_viewport.clearSelectionBox();
+            this.m_viewport.ClearSelectionBox();
             // this.m_opDispatcher.clearSelection();
             // fullviewport.classList.remove('selection-mode');
         });
@@ -225,7 +225,7 @@ class Application {
         /** @private */
         this.m_hoverViewportPosition = { x: 0, y: 0 };
         this.m_appEvents.mouseHoverEventObservable.subscribe((pt) => {
-            const realPt = this.m_viewport.ViewportCoordToGlobalCoord(pt);
+            const realPt = this.m_viewport.ViewportCoordToGlobal(pt);
             this.m_hoverRealPosition = realPt;
             this.m_hoverViewportPosition = pt;
             this.m_hoverPositionSubject.next(realPt);

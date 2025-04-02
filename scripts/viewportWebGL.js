@@ -1,8 +1,7 @@
-import { DrawTextInCanvasAcrossLine, FixedColorCanvasRenderingContext2D } from './core/canvas-utils.js';
-import { AffineTransformation, BoundingBox, Box2boxTransformation, findLineSegmentIntersection, Perpendicular, PointAdd, PointSub, runBeforeNextFrame, VecLength, VecResize } from './core/common.js';
+import { AffineTransformation, BoundingBox, findLineSegmentIntersection, Perpendicular, PointAdd, PointSub, runBeforeNextFrame, VecLength, VecResize } from './core/common.js';
 import { DrawItem } from './core/draw-item.js';
 import { SettingManager } from './settings.js';
-import { Observable, Subject } from './thirdparty/rxjs.js';
+import { ViewportBase } from './viewportBase.js';
 
 class WebGLLayer {
     /**
@@ -84,10 +83,10 @@ class ViewportDrawingLayer extends WebGLLayer {
     set visible(value) { this.m_visible = value; }
 }
 
-class ViewportWebGL {
+class ViewportWebGL extends ViewportBase {
     /** @param {SettingManager} settings */
     constructor(canvasId, settings) {
-        this.m_settings = settings;
+        super(settings);
         this.m_viewportEl = canvasId ? document.getElementById(canvasId) : document.createElement('div');
         this.m_viewportEl.style.background = '#2c2929';
         this.m_viewportEl.style.width = '100%';
@@ -115,7 +114,6 @@ class ViewportWebGL {
         this.m_layerList = [];
         /** @type {DrawItem[]} */
         this.m_selectedObjects = [];
-        this.m_errorSubject = new Subject();
 
         this.m_cssRfreshCount = 0;
         this.m_drawingRefreshCount = 0;
@@ -137,12 +135,13 @@ class ViewportWebGL {
         this.refreshAllLayers();
     }
 
+    /**
+     * @protected
+     * @override
+     */
     refreshAllLayers() {
         this.updateCanvasCSSMatrix();
-        for (const layerInfo of this.m_layerList) {
-            this.refreshLayer(layerInfo);
-        }
-        this.refreshCoordination();
+        super.refreshAllLayers();
     }
 
     /** @private */
@@ -200,7 +199,7 @@ class ViewportWebGL {
     }
 
     /** @private */
-    get RealToViewportTransform() {
+    get GlobalToViewportTransform() {
         const allT = this.m_canvasTransform
             .concat(this.transform_V)
             .concat(this.transform_M)
@@ -209,14 +208,20 @@ class ViewportWebGL {
         return allT;
     }
 
-    /** @private */
-    viewportCoordToGlobal(point) {
-        return this.RealToViewportTransform.revertXY(point);
+    /** 
+     * @public 
+     * @override
+     */
+    ViewportCoordToGlobal(point) {
+        return this.GlobalToViewportTransform.revertXY(point);
     }
 
-    /** @private */
-    globalCoordToViewport(point) {
-        return this.RealToViewportTransform.applyXY(point);
+    /** 
+     * @public 
+     * @override
+     */
+    GlobalCoordToViewport(point) {
+        return this.GlobalToViewportTransform.applyXY(point);
     }
 
     /** @private */
@@ -265,18 +270,20 @@ class ViewportWebGL {
 
     /**
      * @param transform { AffineTransformation }
-     * @private
+     * @override
+     * @public
      */
-    applyTransformToViewport(transform) {
+    ApplyTransformToViewport(transform) {
         this.m_canvasTransform = transform.concat(this.m_canvasTransform);
         this.checkCanvasTransform();
     }
 
     /**
      * @param transform { AffineTransformation }
-     * @private
+     * @override
+     * @public
      */
-    applyTransformToReal(transform) {
+    ApplyTransformToGlobal(transform) {
         const TVtoT = this.transform_V
             .concat(this.transform_M)
             .concat(this.transform_S)
@@ -292,36 +299,25 @@ class ViewportWebGL {
     /**
      * @param transform { AffineTransformation }
      * @returns { AffineTransformation }
-     * @private
+     * @override
+     * @public
      */
-    TransformOfViewportToTransformOfReal(transform) {
-        return this.RealToViewportTransform.revert()
+    TransformOfViewportToTransformOfGlobal(transform) {
+        return this.GlobalToViewportTransform.revert()
             .concat(transform)
-            .concat(this.RealToViewportTransform);
+            .concat(this.GlobalToViewportTransform);
     }
 
     /**
      * @param transform { AffineTransformation }
      * @returns { AffineTransformation }
-     * @private
-     */
-    TransformOfRealToTransformOfViewport(transform) {
-        return this.RealToViewportTransform
-            .concat(transform)
-            .concat(this.RealToViewportTransform.revert());
-    }
-
-    /**
-     * @param transform { AffineTransformation }
+     * @override
      * @public
      */
-    ApplyTransformToRealCoord(transform) {
-        this.applyTransformToReal(transform);
-    }
-
-    /** @public */
-    ViewportCoordToGlobalCoord(pt) {
-        return this.viewportCoordToGlobal(pt);
+    TransformOfGlobalToTransformOfViewport(transform) {
+        return this.GlobalToViewportTransform
+            .concat(transform)
+            .concat(this.GlobalToViewportTransform.revert());
     }
 
     /** @private */
@@ -338,12 +334,18 @@ class ViewportWebGL {
         return ans;
     }
 
-    /** @private */
+    /**
+     * @public
+     * @override
+     */
     get viewportWidth() {
         return this.m_viewportEl.clientWidth;
     }
 
-    /** @private */
+    /**
+     * @public
+     * @override
+     */
     get viewportHeight() {
         return this.m_viewportEl.clientHeight;
     }
@@ -380,6 +382,11 @@ class ViewportWebGL {
         });
     }
 
+    /**
+     * @protected
+     * @param {object} layerInfo 
+     * @override
+     */
     refreshLayer(layerInfo) {
         if (!layerInfo.visible || !layerInfo.gl || !layerInfo.program) return;
 
@@ -402,10 +409,14 @@ class ViewportWebGL {
         return this.transform_K
             .concat(this.transform_S)
             .concat(this.m_transform)
+            .concat(this.m_baseTransform)
             .convertToWebGLMatrix();
     }
 
-    /** @private */
+    /**
+     * @protected
+     * @override
+     */
     refreshSelection() {
         const gl = this.m_selectedItemsCanvas.gl;
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -425,7 +436,10 @@ class ViewportWebGL {
         }
     }
 
-    /** @private */
+    /**
+     * @protected
+     * @override
+     */
     refreshCoordination() {
         // TODO
     }
@@ -433,13 +447,18 @@ class ViewportWebGL {
     /**
      * @param {any[]} items
      * @public
+     * @override
      */
     DrawSelectedItem(items) {
         this.m_selectedObjects = items;
         this.refreshSelection();
     }
 
-    /** @public */
+    /**
+     * @public
+     * @param {{x: number, y: number}[]} pts 
+     * @override
+     */
     DrawSelectionBox(pts) {
         const gl = this.m_selectionBox.gl;
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -451,8 +470,8 @@ class ViewportWebGL {
         const matrixLocation = gl.getUniformLocation(this.m_selectionBox.program, 'u_matrix');
         gl.uniformMatrix3fv(matrixLocation, false, matrix);
 
-        const a = this.viewportCoordToGlobal({ x: 0, y: 0 });
-        const b = this.viewportCoordToGlobal({ x: 2, y: 2 });
+        const a = this.ViewportCoordToGlobal({ x: 0, y: 0 });
+        const b = this.ViewportCoordToGlobal({ x: 2, y: 2 });
         const dx = PointSub(a, b);
         const w = Math.sqrt(dx.x * dx.x + dx.y * dx.y);
         for (let i = 0; i < pts.length; i++) {
@@ -466,8 +485,11 @@ class ViewportWebGL {
         pg.renderingWebGL(gl, this.m_selectionBox.program);
     }
 
-    /** @public */
-    clearSelectionBox() {
+    /**
+     * @public 
+     * @override
+     */
+    ClearSelectionBox() {
         const gl = this.m_selectionBox.gl;
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
         gl.clearColor(0, 0, 0, 0);
@@ -475,74 +497,22 @@ class ViewportWebGL {
     }
 
     /**
-     * @param scaleX { float }
-     * @param scaleY { float }
-     * @param X { float }
-     * @param Y { float }
-     * @private
+     * @public 
+     * @override
      */
-    scaleInViewport(scaleX, scaleY, X, Y) {
-        const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
-        const scaling = new AffineTransformation(scaleX, 0, 0, scaleY, 0, 0);
-        const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
-        return translation2.concat(scaling.concat(translation1));
-    }
-
-    /**
-     * @param X { float }
-     * @param Y { float }
-     * @private
-     */
-    translateInViewport(X, Y) {
-        return AffineTransformation.translate(X, Y);
-    }
-
-    /**
-     * @param clockwiseDegree { float }
-     * @param X { float }
-     * @param Y { float }
-     * @private
-     */
-    rotateAtToViewport(clockwiseDegree, X, Y) {
-        const c = Math.cos(-clockwiseDegree / 180 * Math.PI);
-        const s = Math.sin(-clockwiseDegree / 180 * Math.PI);
-        const translation1 = new AffineTransformation(1, 0, 0, 1, -X, -Y);
-        const rotation = new AffineTransformation(c, s, -s, c, 0, 0);
-        const translation2 = new AffineTransformation(1, 0, 0, 1, X, Y);
-        return translation2.concat(rotation.concat(translation1));
-    }
-
-    /**
-     * @param xVal { float }
-     * @private
-     */
-    flipXAxisToViewport(xVal) {
-        const translation1 = new AffineTransformation(1, 0, 0, 1, -xVal, 0);
-        const scaling = new AffineTransformation(-1, 0, 0, 1, 0, 0);
-        const translation2 = new AffineTransformation(1, 0, 0, 1, xVal, 0);
-        return translation2.concat(scaling.concat(translation1));
-    }
-
-    /**
-     * @param yVal { float }
-     * @private
-     */
-    flipYAxisToViewport(yVal) {
-        const translation1 = new AffineTransformation(1, 0, 0, 1, 0, -yVal);
-        const scaling = new AffineTransformation(1, 0, 0, -1, 0, 0);
-        const translation2 = new AffineTransformation(1, 0, 0, 1, 0, yVal);
-        return translation2.concat(scaling.concat(translation1));
-    }
-
-    /** @public */
     Reset() {
         this.m_transform = AffineTransformation.identity();
         this.m_canvasTransform = AffineTransformation.identity();
         this.refreshAllLayers();
         this.refreshSelection();
     }
-    /** @public */
-    FitScreen() {
+
+    /**
+     * @protected
+     * @override
+     */
+    GetAllObjectsBoundingBox() {
+        /** @type {BoundingBox} */
         let box = null;
         for (const layerInfo of this.m_layerList) {
             if (!layerInfo.visible) {
@@ -553,101 +523,18 @@ class ViewportWebGL {
                 const kbox = obj.getBox();
                 if (box == null) {
                     box = kbox;
-                } else {
-                    if (kbox) {
-                        box = box.mergeBox(kbox);
-                    }
+                } else if (kbox) {
+                    box = box.mergeBox(kbox);
                 }
             }
         }
-
-        if (box == null) {
-            return;
-        }
-        box = box.inflate(10);
-
-        const boxviewport = new BoundingBox(
-            { x: -this.viewportWidth / 2, y: -this.viewportHeight / 2 },
-            { x: this.viewportWidth / 2, y: this.viewportHeight / 2 });
-        this.applyCanvasTransformToTransform();
-        this.m_transform = this.transform_S
-            .concat(Box2boxTransformation(box, boxviewport))
-            .concat(this.transform_S.revert());
-        this.refreshAllLayers();
+        return box;
     }
 
-    /** @public */
-    ScaleUpTransform(X, Y) {
-        if (X && X.x && X.y) {
-            Y = X.y;
-            X = X.x;
-        }
-        X = X || this.viewportCenter.x;
-        Y = Y || this.viewportCenter.y;
-        return this.TransformOfViewportToTransformOfReal(
-            this.scaleInViewport(1.1, 1.1, X, Y));
-    }
-    /** @public */
-    ScaleDownTransform(X, Y) {
-        if (X && X.x && X.y) {
-            Y = X.y;
-            X = X.x;
-        }
-        X = X || this.viewportCenter.x;
-        Y = Y || this.viewportCenter.y;
-        return this.TransformOfViewportToTransformOfReal(
-            this.scaleInViewport(1 / 1.1, 1 / 1.1, X, Y));
-    }
-    /** @public */
-    MoveLeftTransform() {
-        return this.TransformOfViewportToTransformOfReal(
-            this.translateInViewport(-50, 0));
-    }
-    /** @public */
-    MoveRightTransform() {
-        return this.TransformOfViewportToTransformOfReal(
-            this.translateInViewport(50, 0));
-    }
-    /** @public */
-    MoveUpTransform() {
-        return this.TransformOfViewportToTransformOfReal(
-            this.translateInViewport(0, -50));
-    }
-    /** @public */
-    MoveDownTransform() {
-        return this.TransformOfViewportToTransformOfReal(
-            this.translateInViewport(0, 50));
-    }
-    /** @public */
-    TranslateTransform(X, Y) {
-        return this.TransformOfViewportToTransformOfReal(
-            this.translateInViewport(X, Y));
-    }
-    /** @public */
-    RotateAroundTransform(clockwiseDegree, X, Y) {
-        if (X && X.x && X.y) {
-            Y = X.y;
-            X = X.x;
-        }
-        X = X || this.viewportCenter.x;
-        Y = Y || this.viewportCenter.y;
-        return this.TransformOfViewportToTransformOfReal(
-            this.rotateAtToViewport(clockwiseDegree, X, Y));
-    }
-    /** @public */
-    MirrorXTransform(X) {
-        X = X || this.viewportCenter.x;
-        return this.TransformOfViewportToTransformOfReal(
-            this.flipXAxisToViewport(X));
-    }
-    /** @public */
-    MirrorYTransform(Y) {
-        Y = Y || this.viewportCenter.y;
-        return this.TransformOfViewportToTransformOfReal(
-            this.flipYAxisToViewport(Y));
-    }
-
-    /** @public */
+    /**
+     * @public 
+     * @override
+     */
     SetLayerOpacity(layerName, opacity) {
         for (const layerInfo of this.m_layerList) {
             if (layerInfo.layerName == layerName) {
@@ -657,7 +544,10 @@ class ViewportWebGL {
         }
     }
 
-    /** @public */
+    /**
+     * @public 
+     * @override
+     */
     SetLayerVisible(layerName, visible) {
         for (const layerInfo of this.m_layerList) {
             if (layerInfo.layerName == layerName) {
@@ -668,7 +558,10 @@ class ViewportWebGL {
         }
     }
 
-    /** @public */
+    /**
+     * @public 
+     * @override
+     */
     AddLayer(layerName) {
         const layerInfo = new ViewportDrawingLayer(
             layerName, document.createElement('canvas'));
@@ -678,7 +571,10 @@ class ViewportWebGL {
         this.refreshCoordination();
     }
 
-    /** @public */
+    /**
+     * @public 
+     * @override
+     */
     RemoveLayer(layerName) {
         for (let i = 0; i < this.m_layerList.length; i++) {
             if (this.m_layerList[i].layerName == layerName) {
@@ -690,7 +586,10 @@ class ViewportWebGL {
         this.updateCanvasCSSAndProperties();
     }
 
-    /** @public */
+    /**
+     * @public 
+     * @override
+     */
     SortLayers(layerNames) {
         const layerList = [];
         for (const layerName of layerNames) {
@@ -713,6 +612,7 @@ class ViewportWebGL {
      * @param {string} layerName
      * @param {any[]} objects
      * @public
+     * @override
      */
     DrawLayerObjects(layerName, objects) {
         for (const layerInfo of this.m_layerList) {
@@ -724,17 +624,27 @@ class ViewportWebGL {
         }
     }
 
-    /** @public */
+    /**
+     * @return {object[]}
+     * @protected
+     * @override
+     */
+    get LayerList() {
+        return this.m_layerList;
+    }
+
+    /**
+     * @param {string} layerName
+     * @param {any[]} objects
+     * @public
+     * @override
+     */
     GetLayerList() {
         const ans = [];
         for (const layerInfo of this.m_layerList) {
             ans.push(layerInfo.layerName);
         }
         return ans;
-    }
-
-    get viewportCenter() {
-        return { x: this.viewportWidth / 2, y: this.viewportHeight / 2 };
     }
 
     get element() { return this.m_viewportEl; }

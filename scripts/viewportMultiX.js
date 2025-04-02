@@ -1,11 +1,15 @@
+import { SettingManager } from "./settings.js";
 import { Viewport } from "./viewport.js";
+import { ViewportBase } from "./viewportBase.js";
 
 
-class ViewportMultiX {
+class ViewportMultiX extends ViewportBase {
     /**
      * @param { Viewport[] } viewports
+     * @param { SettingManager } settings
      */
-    constructor(viewports) {
+    constructor(viewports, settings) {
+        super(settings);
         console.assert(viewports.length > 0);
         this.m_mainViewport = viewports[0];
         this.m_viewports = viewports;
@@ -28,19 +32,36 @@ class ViewportMultiX {
         }
     }
 
-    /** @public */
+    /**
+     * @public 
+     * @override
+     */
     DrawSelectionBox(boxPts) {
         this.dispatch("DrawSelectionBox", [boxPts]);
     }
 
-    /** @public */
-    ApplyTransformToRealCoord(transform) {
-        this.dispatch("ApplyTransformToRealCoord", [transform]);
+    /**
+     * @public 
+     * @override
+     */
+    ApplyTransformToGlobal(transform) {
+        this.dispatch("ApplyTransformToGlobal", [transform]);
+    }
+
+    /**
+     * @param transform { AffineTransformation }
+     * @returns { AffineTransformation }
+     * @public
+     * @override
+     */
+    TransformOfViewportToTransformOfGlobal(transform) {
+        return this.m_mainViewport.TransformOfViewportToTransformOfGlobal(transform);
     }
 
     /**
      * @param {any[]} items
      * @public
+     * @override
      */
     DrawSelectedItem(items) {
         this.dispatch("DrawSelectedItem", [items]);
@@ -48,97 +69,64 @@ class ViewportMultiX {
 
     /**
      * @public
+     * @override
      */
-    clearSelectionBox() {
-        this.dispatch("clearSelectionBox", []);
+    ClearSelectionBox() {
+        this.dispatch("ClearSelectionBox", []);
     }
 
-    /** @public */
+    /**
+     * @public
+     * @override
+     */
     Reset() {
         this.dispatch("Reset", []);
     }
 
-    /** @public */
+    /**
+     * @public
+     * @override
+     */
     FitScreen() {
         this.dispatch("FitScreen", []);
     }
 
-    /** @public */
-    ScaleUp(X, Y) {
-        const trans = this.m_mainViewport.ScaleUpTransform(X, Y);
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-    /** @public */
-    ScaleDown(X, Y) {
-        const trans = this.m_mainViewport.ScaleDownTransform(X, Y);
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-    /** @public */
-    MoveLeft() {
-        const trans = this.m_mainViewport.MoveLeftTransform();
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-    /** @public */
-    MoveRight() {
-        const trans = this.m_mainViewport.MoveRightTransform();
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-    /** @public */
-    MoveUp() {
-        const trans = this.m_mainViewport.MoveUpTransform();
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-    /** @public */
-    MoveDown() {
-        const trans = this.m_mainViewport.MoveDownTransform();
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-
-    /** @public */
-    Translate(X, Y) {
-        const trans = this.m_mainViewport.TranslateTransform(X, Y);
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-
-    /** @public */
-    RotateAround(clockwiseDegree, X, Y) {
-        const trans = this.m_mainViewport.RotateAroundTransform(clockwiseDegree, X, Y);
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-
-    /** @public */
-    MirrorX(X) {
-        const trans = this.m_mainViewport.MirrorXTransform(X);
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-
-    /** @public */
-    MirrorY(Y) {
-        const trans = this.m_mainViewport.MirrorYTransform(Y);
-        this.dispatch("ApplyTransformToRealCoord", [trans]);
-    }
-
-    /** @public */
+    /**
+     * @public
+     * @override
+     */
     SetLayerOpacity(layerName, opacity) {
         this.dispatch("SetLayerOpacity", [layerName, opacity]);
     }
 
-    /** @public */
+    /**
+     * @public
+     * @override
+     */
     SetLayerVisible(layerName, visible) {
         this.dispatch("SetLayerVisible", [layerName, visible]);
     }
 
-    /** @public */
+    /**
+     * @public
+     * @override
+     */
     AddLayer(layerName) {
         this.dispatch("AddLayer", [layerName]);
     }
 
-    /** @public */
+    /**
+     * @public
+     * @override
+     */
     RemoveLayer(layerName) {
         this.dispatch("RemoveLayer", [layerName]);
     }
 
-    /** @public */
+    /**
+     * @public
+     * @override
+     */
     SortLayers(layerNames) {
         this.dispatch("SortLayers", [layerNames]);
     }
@@ -147,12 +135,16 @@ class ViewportMultiX {
      * @param {string} layerName
      * @param {any[]} objects
      * @public
+     * @override
      */
     DrawLayerObjects(layerName, objects) {
         this.dispatch("DrawLayerObjects", [layerName, objects]);
     }
 
-    /** @public */
+    /**
+     * @public
+     * @override
+     */
     GetLayerList() {
         return this.m_mainViewport.GetLayerList();
     }
@@ -161,9 +153,10 @@ class ViewportMultiX {
      * @public
      * @param { { x: float, y: float } } point
      * @returns { { x: float, y: float } }
+     * @override
      */
-    ViewportCoordToGlobalCoord(point) {
-        return this.m_mainViewport.ViewportCoordToGlobalCoord(point);
+    ViewportCoordToGlobal(point) {
+        return this.m_mainViewport.ViewportCoordToGlobal(point);
     }
 
     /** @public */
@@ -179,24 +172,29 @@ class ViewportMultiX {
     }
 
     /**
-     * @return { { x: float, y: float } }
      * @public
+     * @override
      */
-    get viewportCenter() {
-        return this.m_mainViewport.viewportCenter;
+    get viewportWidth() {
+        return this.m_mainViewport.viewportWidth;
     }
 
     /**
-     * @return { { x: float, y: float } }
      * @public
+     * @override
      */
-    get viewportCenterToGlobal() {
-        return this.m_mainViewport.viewportCenterToGlobal;
+    get viewportHeight() {
+        return this.m_mainViewport.viewportHeight;
     }
 
     /** @public */
     get errorObservable() {
-        return this.m_mainViewport.errorObservable;
+        return new Observable(subscriber => {
+            super.errorObservable.subscribe(subscriber);
+            for (const vp of this.viewports) {
+                vp.errorObservable.subscribe(subscriber);
+            }
+        });
     }
 }
 

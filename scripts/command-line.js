@@ -138,7 +138,7 @@ class CommandLine {
     }
 
     cmdApplyTransform(trans) {
-        this.m_application.m_viewport.ApplyTransformToRealCoord(trans);
+        this.m_application.m_viewport.ApplyTransformToGlobal(trans);
     }
 
     /** @private */
@@ -243,7 +243,7 @@ class CommandLine {
         } else if (c === 'translate') {
             const deltaX = parseFloat(args[0]);
             const deltaY = parseFloat(args[1]);
-            if(isNaN(deltaX) || isNaN(deltaY)) {
+            if (isNaN(deltaX) || isNaN(deltaY)) {
                 this.showError("invalid translation");
             } else {
                 this.m_application.m_viewport.Translate(deltaX, deltaY);
