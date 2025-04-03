@@ -395,6 +395,27 @@ class ViewportWebGL extends ViewportBase {
         });
     }
 
+    /** @private */
+    get GlobalToCanvasTransfrom() {
+        return this.transform_M
+            .concat(this.transform_S)
+            .concat(this.m_transform);
+    }
+
+    /** @private */
+    get FittingPrecision() {
+        const M = this.GlobalToCanvasTransfrom.revert();
+        const ox = { x: 0, y: 0 };
+        const unit = 10000;
+        let sumx = 0, countx = 0;
+        for (const vec of [{ x: 0, y: unit }, { x: unit, y: 0 }, { x: unit, y: unit }, { x: unit, y: -unit }]) {
+            const d = PointSub(M.applyXY(vec), M.applyXY(ox));
+            sumx += VecLength(d) / VecLength(vec);
+            countx += 1;
+        }
+        return sumx / (countx * 10);
+    }
+
     /**
      * @protected
      * @param {object} layerInfo 
@@ -413,8 +434,11 @@ class ViewportWebGL extends ViewportBase {
         const matrixLocation = gl.getUniformLocation(layerInfo.program, 'u_matrix');
         gl.uniformMatrix3fv(matrixLocation, false, matrix);
 
+        const p = this.FittingPrecision;
         layerInfo.drawedItems.forEach(item => {
-            item.renderingWebGL(gl, layerInfo.program);
+            const options = new DrawItemWebGLOptions();
+            options.m_fittingPrecision = p;
+            item.renderingWebGL(gl, layerInfo.program, options);
         });
     }
 
@@ -441,9 +465,11 @@ class ViewportWebGL extends ViewportBase {
         const matrixLocation = gl.getUniformLocation(this.m_selectedItemsCanvas.program, 'u_matrix');
         gl.uniformMatrix3fv(matrixLocation, false, matrix);
 
+        const p = this.FittingPrecision;
         for (const obj of this.m_selectedObjects) {
             const options = new DrawItemWebGLOptions();
             options.m_overrideColor = this.m_settings.selectedItemColor;
+            options.m_fittingPrecision = p;
             obj.renderingWebGL(
                 this.m_selectedItemsCanvas.gl,
                 this.m_selectedItemsCanvas.program,

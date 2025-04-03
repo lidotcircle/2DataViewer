@@ -22,6 +22,7 @@ function sanitizePoints(obj) {
 class DrawItemWebGLOptions {
     constructor() {
         this.m_overrideColor = null;
+        this.m_fittingPrecision = null;
     }
 };
 
@@ -218,9 +219,9 @@ class DrawItem {
                     const p1 = new Point(item.center.x + x1, item.center.y + y1);
                     const p2 = new Point(item.center.x + x2, item.center.y + y2);
                     if (item.width) {
-                        return Shape.CreateArcSegWithWidthCircleEndpoints(p1, p2, item.radius, item.isCounterClockwise, item.width);
+                        return Shape.CreateArcSegWithWidthCircleEndpoints(p1, p2, item.center, item.radius, item.isCounterClockwise, item.width);
                     } else {
-                        return Shape.CreateArcSeg(p1, p2, item.radius, item.isCounterClockwise);
+                        return Shape.CreateArcSeg(p1, p2, item.center, item.radius, item.isCounterClockwise);
                     }
                 }
             default:
@@ -305,7 +306,6 @@ class DrawItem {
             path.ellipse(
                 item.center.x, item.center.y, item.radius, item.radius, 0, 0,
                 360);
-            ;
             ctx.fill(path);
             if (item.comment) {
                 ctx.fillStyle = 'white';
@@ -329,7 +329,6 @@ class DrawItem {
                 path.ellipse(
                     item.point1.x, item.point1.y, item.width / 2,
                     item.width / 2, 0, 0, 360);
-                ;
                 ctx.fill(path);
             }
             {
@@ -338,7 +337,6 @@ class DrawItem {
                 path.ellipse(
                     item.point2.x, item.point2.y, item.width / 2,
                     item.width / 2, 0, 0, 360);
-                ;
                 ctx.fill(path);
             }
             if (item.comment) {
@@ -404,6 +402,27 @@ class DrawItem {
             const endRad = item.endAngle * Math.PI / 180;
             path.arc(item.center.x, item.center.y, item.radius, startRad, endRad, !item.isCounterClockwise);
             ctx.stroke(path);
+            if (!item.acute && item.width != null && item.width > 1) {
+                const w = item.width || 1;
+                {
+                    const cos = Math.cos(startRad) * item.radius;
+                    const sin = Math.sin(startRad) * item.radius;
+                    const p = PointAdd(item.center, { x: cos, y: sin });
+                    ctx.fillStyle = item.color;
+                    const path = new Path2D();
+                    path.ellipse(p.x, p.y, w / 2, w / 2, 0, 0, 360);
+                    ctx.fill(path);
+                }
+                {
+                    const cos = Math.cos(endRad) * item.radius;
+                    const sin = Math.sin(endRad) * item.radius;
+                    const p = PointAdd(item.center, { x: cos, y: sin });
+                    ctx.fillStyle = item.color;
+                    const path = new Path2D();
+                    path.ellipse(p.x, p.y, w / 2, w / 2, 0, 0, 360);
+                    ctx.fill(path);
+                }
+            }
             if (item.comment) {
                 ctx.fillStyle = 'white';
                 DrawTextInCanvasAcrossLine(
@@ -488,22 +507,31 @@ class DrawItem {
         ];
     }
 
+    circleFittingN(r, p) {
+        if (p == null || p * 2 > r) {
+            return 32;
+        } else {
+            return Math.ceil(Math.PI / Math.acos(1 - p / r));
+        }
+    }
+
     renderCircleWebGL(gl, program, options) {
-        const vertices = this.generateCircleVertices();
+        const N = this.circleFittingN(this.radius, options.m_fittingPrecision);
+        const vertices = DrawItem.generateCircleVertices(this.center, this.radius, N);
         DrawItem.renderGeometry(
             gl, program, vertices,
             options.m_overrideColor || this.color, gl.TRIANGLE_FAN);
     }
 
-    generateCircleVertices(segments = 32) {
-        const vertices = [this.center.x, this.center.y];
+    static generateCircleVertices(c, r, segments = 32) {
+        const vertices = [c.x, c.y];
         const angleStep = (Math.PI * 2) / segments;
 
         for (let i = 0; i <= segments; i++) {
             const angle = i * angleStep;
             vertices.push(
-                this.center.x + Math.cos(angle) * this.radius,
-                this.center.y + Math.sin(angle) * this.radius
+                c.x + Math.cos(angle) * r,
+                c.y + Math.sin(angle) * r
             );
         }
         return vertices;
@@ -533,20 +561,65 @@ class DrawItem {
     }
 
     renderArcWebGL(gl, program, options) {
-        const vertices = this.generateArcVertices();
+        const agap = this.angleGap(this.startAngle, this.endAngle, this.isCounterClockwise);
+        const r = this.radius + (this.width || 1) / 2;
+        const NT = this.circleFittingN(r, options.m_fittingPrecision);
+        const N = Math.ceil(NT * agap / 360);
+        const step = agap / N;
+        const vertices = this.generateArcVertices(
+            this.startAngle, this.radius, this.width, step, this.isCounterClockwise, N);
         DrawItem.renderGeometry(
             gl, program, vertices,
             options.m_overrideColor || this.color, gl.TRIANGLE_STRIP);
+
+        if (!this.acute && this.width != null && this.width > 1) {
+            const startRad = this.startAngle * Math.PI / 180;
+            const endRad = this.endAngle * Math.PI / 180;
+            const cos1 = Math.cos(startRad) * this.radius;
+            const sin1 = Math.sin(startRad) * this.radius;
+            const p1 = PointAdd(this.center, { x: cos1, y: sin1 });
+            const cos2 = Math.cos(endRad) * this.radius;
+            const sin2 = Math.sin(endRad) * this.radius;
+            const p2 = PointAdd(this.center, { x: cos2, y: sin2 });
+
+            const N = this.circleFittingN(this.width / 2, options.m_fittingPrecision);
+            const vertices1 = DrawItem.generateCircleVertices(p1, this.width / 2, N);
+            const vertices2 = DrawItem.generateCircleVertices(p2, this.width / 2, N);
+            DrawItem.renderGeometry(
+                gl, program, vertices1,
+                options.m_overrideColor || this.color, gl.TRIANGLE_FAN);
+            DrawItem.renderGeometry(
+                gl, program, vertices2,
+                options.m_overrideColor || this.color, gl.TRIANGLE_FAN);
+        }
     }
 
-    generateArcVertices(segments = 32) {
-        const startRad = this.startAngle * Math.PI / 180;
-        const endRad = this.endAngle * Math.PI / 180;
-        const angleStep = (endRad - startRad) / segments;
+    angleGap(start, end, isCClockwise) {
+        if (start == end) {
+            return 360;
+        }
+        if (isCClockwise) {
+            if (start < end) {
+                return end - start;
+            } else {
+                return 360 - (start - end);
+            }
+        } else {
+            if (start < end) {
+                return 360 - (end - start);
+            } else {
+                return start - end;
+            }
+        }
+    }
+
+    generateArcVertices(startAngle, r, width, step, isCounterClockwise, segments) {
+        const startRad = startAngle * Math.PI / 180;
+        const angleStep = isCounterClockwise ? step * Math.PI / 180 : -step * Math.PI / 180;
         const vertices = [];
-        const w = this.width || 1;
-        const innerRadius = this.radius - w / 2;
-        const outerRadius = this.radius + w / 2;
+        const w = width || 1;
+        const innerRadius = r - w / 2;
+        const outerRadius = r + w / 2;
 
         for (let i = 0; i <= segments; i++) {
             const angle = startRad + i * angleStep;

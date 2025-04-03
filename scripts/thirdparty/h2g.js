@@ -53,8 +53,9 @@ class PointNode {
         return new PointNode(p);
     }
 
-    static createArcConnection(p, radius, cclockwise) {
+    static createArcConnection(p, c, radius, cclockwise) {
         const a = new PointNode(p);
+        a.m_c = c;
         a.m_isArc = true;
         a.m_radius = radius;
         a.m_cclockwise = cclockwise;
@@ -145,24 +146,24 @@ class Shape {
       * @param {integer} radius
       * @param {boolean} cclockwise
       */
-    static CreateArcSeg(p1, p2, radius, cclockwise) {
+    static CreateArcSeg(p1, p2, c, radius, cclockwise) {
         const s = new Shape();
         console.assert(H2GModule);
-        s.m_obj = h2g.HShape.createArcSegment(p1.x, p1.y, p2.x, p2.y, radius, cclockwise);
+        s.m_obj = h2g.HShape.createArcSegment(p1.x, p1.y, p2.x, p2.y, c.x, c.y, radius, cclockwise);
         return s;
     }
 
-    static CreateArcSegWithWidth(p1, p2, radius, cclockwise, width) {
+    static CreateArcSegWithWidth(p1, p2, c, radius, cclockwise, width) {
         const s = new Shape();
         console.assert(H2GModule);
-        s.m_obj = h2g.HShape.createArcSegmentWithWidth(p1.x, p1.y, p2.x, p2.y, radius, cclockwise, width);
+        s.m_obj = h2g.HShape.createArcSegmentWithWidth(p1.x, p1.y, p2.x, p2.y, c.x, c.y, radius, cclockwise, width);
         return s;
     }
 
-    static CreateArcSegWithWidthCircleEndpoints(p1, p2, radius, cclockwise, width) {
+    static CreateArcSegWithWidthCircleEndpoints(p1, p2, c, radius, cclockwise, width) {
         const s = new Shape();
         console.assert(H2GModule);
-        s.m_obj = h2g.HShape.createArcSegmentWithWidthAndCircleEndpoints(p1.x, p1.y, p2.x, p2.y, radius, cclockwise, width);
+        s.m_obj = h2g.HShape.createArcSegmentWithWidthAndCircleEndpoints(p1.x, p1.y, p2.x, p2.y, c.x, c.y, radius, cclockwise, width);
         return s;
     }
 
@@ -205,7 +206,7 @@ class Shape {
         console.assert(H2GModule);
         console.assert(points.length >= 3);
         const n = points.length;
-        const ndSize = 5;
+        const ndSize = 7;
         const buf = new Int32Array(n * ndSize);
         for (let i = 0; i < n; i++) {
             buf[i * ndSize] = points[i].m_p.x;
@@ -213,6 +214,8 @@ class Shape {
             buf[i * ndSize + 2] = points[i].m_isArc ? 1 : 0;
             buf[i * ndSize + 3] = points[i].m_radius;
             buf[i * ndSize + 4] = points[i].m_cclockwise ? 1 : 0;
+            buf[i * ndSize + 5] = points[i].m_c?.x || 0;
+            buf[i * ndSize + 6] = points[i].m_c?.y || 0;
         }
         const bufx = h2g._malloc(n * ndSize * 4);
         h2g.HEAP32.set(buf, bufx / 4);
