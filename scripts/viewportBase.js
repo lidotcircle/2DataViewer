@@ -219,9 +219,13 @@ class ViewportBase {
         if (box) {
             const a = { x: 0, y: 0 };
             const b = { x: this.viewportWidth, y: this.viewportHeight };
+            const c = { x: 0, y: this.viewportHeight };
+            const d = { x: this.viewportWidth, y: 0 };
             const ga = this.ViewportCoordToGlobal(a);
             const gb = this.ViewportCoordToGlobal(b);
-            const boxviewport = new BoundingBox(ga, gb);
+            const gc = this.ViewportCoordToGlobal(c);
+            const gd = this.ViewportCoordToGlobal(d);
+            const boxviewport = new BoundingBox(ga, gb).mergePoint(gc).mergePoint(gd);
             this.ApplyTransformToGlobal(Box2boxTransformation(box, boxviewport));
         }
     }

@@ -465,22 +465,27 @@ class ViewportWebGL extends ViewportBase {
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-        const matrix = this.getWebGLMatrix();
+        const canvasPts = [];
+        for (const pt of pts) {
+            canvasPts.push(this.viewportCoordToCanvas(this.GlobalCoordToViewport(pt)));
+        }
+
+        const matrix = this.transform_K.concat(this.transform_M.revert()).convertToWebGLMatrix();
         gl.useProgram(this.m_selectionBox.program);
         const matrixLocation = gl.getUniformLocation(this.m_selectionBox.program, 'u_matrix');
         gl.uniformMatrix3fv(matrixLocation, false, matrix);
 
-        const a = this.ViewportCoordToGlobal({ x: 0, y: 0 });
-        const b = this.ViewportCoordToGlobal({ x: 2, y: 2 });
+        const a = this.viewportCoordToCanvas({ x: 0, y: 0 });
+        const b = this.viewportCoordToCanvas({ x: 2, y: 2 });
         const dx = PointSub(a, b);
         const w = Math.sqrt(dx.x * dx.x + dx.y * dx.y);
-        for (let i = 0; i < pts.length; i++) {
-            const line = DrawItem.CreateCLine(pts[i], pts[(i + 1) % pts.length], w);
+        for (let i = 0; i < canvasPts.length; i++) {
+            const line = DrawItem.CreateCLine(canvasPts[i], canvasPts[(i + 1) % canvasPts.length], w);
             line.setColor(this.m_settings.selectionBoxBoundaryColor);
             line.renderingWebGL(gl, this.m_selectionBox.program);
         }
 
-        const pg = DrawItem.CreatePolygon(pts);
+        const pg = DrawItem.CreatePolygon(canvasPts);
         pg.setColor(this.m_settings.selectionBoxMainColor);
         pg.renderingWebGL(gl, this.m_selectionBox.program);
     }

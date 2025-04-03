@@ -37,4 +37,26 @@ describe('randomAffineTransformTest', () => {
             expect(AFTEqual(A.concat(B).concat(C), A.concat(B.concat(C)))).toEqual(true);
         }
     });
+
+    test('applyXY and revertXY', () => {
+        for (let i = 0; i < 1000; i++) {
+            const Trans = RandomAffineTransform();
+            for (let j = 0; j < 10; j++) {
+                const a = (Math.random() - 0.5) * 10000;
+                const b = (Math.random() - 0.5) * 10000;
+                {
+                    const m = Trans.applyXY({ x: a, y: b });
+                    const hu = Trans.revertXY(m);
+                    expect(Math.abs(hu.x - a) < 10e-5).toEqual(true);
+                    expect(Math.abs(hu.y - b) < 10e-5).toEqual(true);
+                }
+                {
+                    const m = Trans.revertXY({ x: a, y: b });
+                    const hu = Trans.applyXY(m);
+                    expect(Math.abs(hu.x - a) < 10e-5).toEqual(true);
+                    expect(Math.abs(hu.y - b) < 10e-5).toEqual(true);
+                }
+            }
+        }
+    });
 });

@@ -109,23 +109,7 @@ class AffineTransformation {
     }
 
     revertXY(point) {
-        const determinant = this.a * this.d - this.b * this.c;
-        if (determinant === 0) {
-            throw new Error('Transformation is not invertible.');
-        }
-
-        const invDet = 1 / determinant;
-        const newA = this.d * invDet;
-        const newB = -this.b * invDet;
-        const newC = -this.c * invDet;
-        const newD = this.a * invDet;
-        const newTx = (this.c * this.ty - this.d * this.tx) * invDet;
-        const newTy = (this.b * this.tx - this.a * this.ty) * invDet;
-
-        const x = newA * point.x + newB * point.y + newTx;
-        const y = newC * point.x + newD * point.y + newTy;
-
-        return { x, y };
+        return this.revert().applyXY(point);
     }
 
     revert() {

@@ -525,8 +525,12 @@ class Viewport extends ViewportBase {
         xpath.closePath();
         ctx.fill(xpath);
 
+        const p1 = this.viewportCoordToCanvas({ x: 0, y: 0 });
+        const p2 = this.viewportCoordToCanvas({ x: 2, y: 2 });
+        const diff = PointSub(p1, p2);
+        const w = Math.sqrt(diff.x * diff.x + diff.y * diff.y);
         ctx.strokeStyle = this.m_settings.selectionBoxBoundaryColor;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = w * 0.7;
         const path = new Path2D();
         for (let p of canvasPts) {
             path.lineTo(p.x, p.y);
@@ -647,8 +651,7 @@ class Viewport extends ViewportBase {
             .concat(this.m_canvasTransform)
             .concat(this.m_transform)
             .concat(this.transform_S);
-        const ans = transform.revertXY(point);
-        return { x: Math.round(ans.x), y: Math.round(ans.y) };
+        return transform.revertXY(point);
     }
 
     /** 
@@ -661,8 +664,7 @@ class Viewport extends ViewportBase {
             .concat(this.m_canvasTransform)
             .concat(this.m_transform)
             .concat(this.transform_S);
-        const ans = transform.applyXY(point);
-        return { x: Math.round(ans.x), y: Math.round(ans.y) };
+        return transform.applyXY(point);
     }
 
     /** @private */
