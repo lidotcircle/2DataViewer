@@ -77,9 +77,10 @@ class Viewport extends ViewportBase {
     /**
      * @param {string | null} canvasId
      * @param {SettingManager} settings
+     * @param {AffineTransformation} baseTransform
      */
-    constructor(canvasId, settings) {
-        super(settings);
+    constructor(canvasId, settings, baseTransform) {
+        super(settings, baseTransform);
 
         /**
          * @type HTMLDivElement
@@ -650,7 +651,8 @@ class Viewport extends ViewportBase {
             .concat(this.transform_M)
             .concat(this.m_canvasTransform)
             .concat(this.m_transform)
-            .concat(this.transform_S);
+            .concat(this.transform_S)
+            .concat(this.m_baseTransform);
         return transform.revertXY(point);
     }
 
@@ -663,7 +665,8 @@ class Viewport extends ViewportBase {
             .concat(this.transform_M)
             .concat(this.m_canvasTransform)
             .concat(this.m_transform)
-            .concat(this.transform_S);
+            .concat(this.transform_S)
+            .concat(this.m_baseTransform);
         return transform.applyXY(point);
     }
 
@@ -731,7 +734,7 @@ class Viewport extends ViewportBase {
      * @public
      */
     ApplyTransformToGlobal(transform) {
-        const qt = this.m_transform.concat(this.transform_S);
+        const qt = this.m_transform.concat(this.transform_S).concat(this.m_baseTransform);
         this.m_canvasTransform = this.m_canvasTransform
             .concat(qt).concat(transform).concat(qt.revert());
         this.checkCanvasTransform();
@@ -748,7 +751,8 @@ class Viewport extends ViewportBase {
             .concat(this.transform_M)
             .concat(this.m_canvasTransform)
             .concat(this.m_transform)
-            .concat(this.transform_S);
+            .concat(this.transform_S)
+            .concat(this.m_baseTransform);
         return allT.revert().concat(transform).concat(allT);
     }
 
@@ -763,7 +767,8 @@ class Viewport extends ViewportBase {
             .concat(this.transform_M)
             .concat(this.m_canvasTransform)
             .concat(this.m_transform)
-            .concat(this.transform_S);
+            .concat(this.transform_S)
+            .concat(this.m_baseTransform);
         return allT.concat(transform).concat(allT.revert());
     }
 

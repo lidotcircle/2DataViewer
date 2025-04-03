@@ -3,6 +3,7 @@ import van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
 import { Application } from './application.js';
 import { SplitString } from './core/str-utils.js';
+import { parseTokens, tokenize } from './shape-parser.js';
 
 
 function splitString(input) {
@@ -147,11 +148,6 @@ class CommandLine {
     }
 
     /** @private */
-    cmdClear() {
-        this.m_objectManager.clear();
-    }
-
-    /** @private */
     cmdSet(args) {
         const argv = splitString(args);
         if (argv.length == 0) {
@@ -289,6 +285,14 @@ class CommandLine {
         tokens.shift();
         if (c === 'draw') {
             this.cmdDraw(cmd.substr(5));
+        } else if (c == 'add') {
+            let text = tokens.join(" ");
+            if (!text.startsWith("( scene")) {
+                text = "(scene " + text + ")";
+            }
+            const shapes = parseTokens(tokenize(text));
+            this.m_application.OpDispatcher.addObjects(
+                DrawItem.plainObject2DrawItem(shapes));
         } else if (c === 'undo') {
             this.m_application.OpDispatcher.rollback();
         } else if (c === 'redo') {

@@ -3,7 +3,7 @@ import { SettingManager } from './settings.js';
 import { Viewport } from './viewport.js';
 import { Subject } from './thirdparty/rxjs.js';
 import { DrawItem } from './core/draw-item.js';
-import { BoundingBox, text2htmlElement } from './core/common.js';
+import { AffineTransformation, BoundingBox, text2htmlElement } from './core/common.js';
 import { MultiFrameSource } from './multi-frame-source.js';
 import Van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
@@ -129,10 +129,16 @@ class Application {
             },
             extraViewport: {
                 position: "absolute",
-                width: "20vw",
+                width: "20vh",
                 height: "20vh",
-                left: "10vw",
+                left: "10vh",
                 top: "10vh",
+                '@media all and (orientation: portrait)': {
+                    width: "20vw",
+                    height: "20vw",
+                    left: "10vw",
+                    top: "10vw",
+                },
                 "z-index": 100,
                 "overflow": "hidden",
                 "border-radius": "0.2em",

@@ -84,9 +84,12 @@ class ViewportDrawingLayer extends WebGLLayer {
 }
 
 class ViewportWebGL extends ViewportBase {
-    /** @param {SettingManager} settings */
-    constructor(canvasId, settings) {
-        super(settings);
+    /** 
+     * @param {SettingManager} settings 
+     * @param {AffineTransformation} baseTransform
+     */
+    constructor(canvasId, settings, baseTransform) {
+        super(settings, baseTransform);
         this.m_viewportEl = canvasId ? document.getElementById(canvasId) : document.createElement('div');
         this.m_viewportEl.style.background = '#2c2929';
         this.m_viewportEl.style.width = '100%';
@@ -204,7 +207,8 @@ class ViewportWebGL extends ViewportBase {
             .concat(this.transform_V)
             .concat(this.transform_M)
             .concat(this.transform_S)
-            .concat(this.m_transform);
+            .concat(this.m_transform)
+            .concat(this.m_baseTransform);
         return allT;
     }
 
@@ -300,7 +304,8 @@ class ViewportWebGL extends ViewportBase {
         const TVtoT = this.transform_V
             .concat(this.transform_M)
             .concat(this.transform_S)
-            .concat(this.m_transform);
+            .concat(this.m_transform)
+            .concat(this.m_baseTransform);
         this.m_canvasTransform =
             this.m_canvasTransform
                 .concat(TVtoT)
@@ -399,7 +404,8 @@ class ViewportWebGL extends ViewportBase {
     get GlobalToCanvasTransfrom() {
         return this.transform_M
             .concat(this.transform_S)
-            .concat(this.m_transform);
+            .concat(this.m_transform)
+            .concat(this.m_baseTransform);
     }
 
     /** @private */
