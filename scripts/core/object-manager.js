@@ -4,6 +4,7 @@ import { RTree, Shape, Point } from '../thirdparty/h2g.js';
 import { Observable, Subject } from '../thirdparty/rxjs.js';
 import { SettingManager } from '../settings.js';
 import { runBeforeNextFrame } from './common.js';
+import { SVGExporter } from './svg-exporter.js';
 
 
 class ObjectsInLayer {
@@ -345,6 +346,20 @@ class ObjectManager {
             this.m_selectedObjects = [];
             this.m_selectedObjectsSubject.next(this.m_selectedObjects);
         }
+    }
+
+    /**
+     * @returns {string}
+     */
+    GenerateSVG() {
+        const exporter = new SVGExporter();
+        for (const layer of this.m_layers) {
+            const objects = layer.allObjects;
+            if (objects.length > 0) {
+                exporter.AddGroup(layer.layerName, objects);
+            }
+        }
+        return exporter.Export();
     }
 
     /**

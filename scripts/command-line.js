@@ -4,6 +4,7 @@ import jss from './thirdparty/jss.js';
 import { Application } from './application.js';
 import { SplitString } from './core/str-utils.js';
 import { parseTokens, tokenize } from './shape-parser.js';
+import { SaveStringToFile } from './core/common.js';
 
 
 function splitString(input) {
@@ -140,6 +141,18 @@ class CommandLine {
 
     cmdApplyTransform(trans) {
         this.m_application.m_viewport.ApplyTransformToGlobal(trans);
+    }
+
+    /** @private */
+    cmdExport(args) {
+        const c = args[0];
+        if (c === 'svg' || c === 'SVG') {
+            const text = this.m_objectManager.GenerateSVG();
+            SaveStringToFile("export.svg", text);
+        } else {
+            this.showError(`export ${c} not supported`);
+            return;
+        }
     }
 
     /** @private */
@@ -293,6 +306,8 @@ class CommandLine {
             const shapes = parseTokens(tokenize(text));
             this.m_application.OpDispatcher.addObjects(
                 DrawItem.plainObject2DrawItem(shapes));
+        } else if (c === 'export') {
+            this.cmdExport(tokens);
         } else if (c === 'undo') {
             this.m_application.OpDispatcher.rollback();
         } else if (c === 'redo') {

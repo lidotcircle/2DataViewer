@@ -6,6 +6,25 @@ function PointSub(p1, p2) {
     return { x: p1.x - p2.x, y: p1.y - p2.y };
 }
 
+/**
+ * 
+ * @param {{x: number, y: number}} segA
+ * @param {{x: number, y: number}} segB
+ * @param {{x: number, y: number}} pt
+ */
+function SegSide(segA, segB, pt) {
+    const seg = PointSub(segB, segA);
+    const ptSeg = PointSub(pt, segA);
+    const cross = seg.x * ptSeg.y - seg.y * ptSeg.x;
+    if (cross > 0) {
+        return 1; // left
+    } else if (cross < 0) {
+        return -1; // right
+    } else {
+        return 0; // collinear
+    }
+}
+
 function VecResize(vec, size) {
     const length = Math.sqrt(vec.x * vec.x + vec.y * vec.y);
     return { x: vec.x * size / length, y: vec.y * size / length };
@@ -480,6 +499,20 @@ function genStyle(styleKeyValues) {
         .join(';');
 }
 
+/**
+ * @param {string} fileName 
+ * @param {string} content 
+ */
+function SaveStringToFile(fileName, content) {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
 export {
     AffineTransformation,
     BoundingBox,
@@ -487,6 +520,7 @@ export {
     text2htmlElement,
     PointSub,
     PointAdd,
+    SegSide,
     VecResize,
     VecLength,
     Perpendicular,
@@ -497,4 +531,5 @@ export {
     findLineSegmentIntersection,
     runBeforeNextFrame,
     genStyle,
+    SaveStringToFile,
 };
