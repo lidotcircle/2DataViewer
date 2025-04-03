@@ -685,17 +685,32 @@ class Viewport extends ViewportBase {
         const d = this.viewportCoordToCanvas({ x: 0, y: this.viewportHeight });
         const outerbox = new BoundingBox(
             { x: 0, y: 0 }, { x: this.canvasWidth, y: this.canvasHeight });
-        const xa = (this.canvasWidth - this.viewportWidth) / 2;
-        const ya = (this.canvasHeight - this.viewportHeight) / 2;
-        const innerbox = new BoundingBox(
-            { x: xa, y: ya },
-            { x: xa + this.viewportWidth, y: ya + this.viewportHeight });
 
-        // FIXME rotation
-        return outerbox.containsPoint(a) && outerbox.containsPoint(b) &&
-            outerbox.containsPoint(c) && outerbox.containsPoint(d) &&
-            !innerbox.containsPoint(a) && !innerbox.containsPoint(b) &&
-            !innerbox.containsPoint(c) && !innerbox.containsPoint(d);
+        if (!(outerbox.containsPoint(a) && outerbox.containsPoint(b) &&
+            outerbox.containsPoint(c) && outerbox.containsPoint(d))) {
+            return false;
+        }
+
+        const C2V = this.transform_V
+            .concat(this.transform_M)
+            .concat(this.m_canvasTransform)
+            .concat(this.transform_M.revert());
+        const V2C = C2V.revert();
+        {
+            const a = V2C.a;
+            const b = V2C.b;
+            const c = V2C.c;
+            const d = V2C.d;
+            const threshold = 0.01;
+            const v1 = (a * b + c * d);
+            const v2 = (a * a + c * c);
+            const v3 = (b * b + d * d);
+            if (v2 >= 1 - threshold && v3 >= 1 - threshold &&
+                (v2 - 1 + threshold) * (v3 - 1 + threshold) >= v1 * v1) {
+                return true;
+            }
+            return false;
+        }
     }
 
     /**

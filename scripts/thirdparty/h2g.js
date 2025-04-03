@@ -87,6 +87,13 @@ class Shape {
         return ans;
     }
 
+    /**
+     * @param {{x: number, y: number}} pt
+     */
+    contains(pt) {
+        return this.m_obj.contains(pt.x, pt.y);
+    }
+
     box() {
         const info = this.m_obj.box();
         const origin = info.origin();

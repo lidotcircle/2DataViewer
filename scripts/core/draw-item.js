@@ -1,4 +1,4 @@
-import { AffineTransformation, BoundingBox, HTMLColorStringToRGBAInternal, Perpendicular, PointAdd, PointSub, VecResize } from './common.js';
+import { AffineTransformation, BoundingBox, HTMLColorStringToRGBAInternal, Perpendicular, PointAdd, PointSub, VecLength, VecResize } from './common.js';
 import { DrawTextInCanvasAcrossLine } from './canvas-utils.js';
 import { Shape, Point } from '../thirdparty/h2g.js';
 
@@ -18,6 +18,12 @@ function sanitizePoints(obj) {
         }
     }
 }
+
+class DrawItemWebGLOptions {
+    constructor() {
+        this.m_overrideColor = null;
+    }
+};
 
 class DrawItem {
     static CreateCircle(center, radius) {
@@ -252,6 +258,18 @@ class DrawItem {
         return objectList
     }
 
+    /**
+     * @param {{x: number, y: number}} pt
+     */
+    contains(pt) {
+        if (this.type() == "circle") {
+            const dx = PointSub(pt, this.center);
+            return VecLength(dx) < this.radius;
+        } else if (this.type() == "polygon") {
+            return this.shape().contains(pt);;
+        }
+    }
+
     shape() {
         if (this.m_shape != null) {
             return this.m_shape;
@@ -400,50 +418,55 @@ class DrawItem {
      * WebGL rendering implementation
      * @param {WebGLRenderingContext} gl 
      * @param {WebGLProgram} program 
-     * @param {string} override color
+     * @param {DrawItemWebGLOptions} options
      */
-    renderingWebGL(gl, program, ocolor = null) {
+    renderingWebGL(gl, program, options = new DrawItemWebGLOptions()) {
         switch (this.type) {
             case 'line':
-                this.renderLineWebGL(gl, program, ocolor);
+                this.renderLineWebGL(gl, program, options);
                 break;
             case 'cline':
-                this.renderClineWebGL(gl, program, ocolor);
+                this.renderClineWebGL(gl, program, options);
                 break;
             case 'circle':
-                this.renderCircleWebGL(gl, program, ocolor);
+                this.renderCircleWebGL(gl, program, options);
                 break;
             case 'polygon':
-                this.renderPolygonWebGL(gl, program, ocolor);
+                this.renderPolygonWebGL(gl, program, options);
                 break;
             case 'arc':
-                this.renderArcWebGL(gl, program, ocolor);
+                this.renderArcWebGL(gl, program, options);
                 break;
             case 'compound':
-                this.renderCompoundWebGL(gl, program, ocolor);
+                this.renderCompoundWebGL(gl, program, options);
                 break;
         }
     }
 
-    renderLineWebGL(gl, program, ocolor) {
+    /**
+     * @param {DrawItemWebGLOptions} options
+     */
+    renderLineWebGL(gl, program, options) {
         const vertices = this.generateLineVertices();
-        DrawItem.renderGeometry(gl, program, vertices, ocolor || this.color, gl.TRIANGLES);
+        DrawItem.renderGeometry(
+            gl, program, vertices,
+            options.m_overrideColor || this.color, gl.TRIANGLES);
     }
 
-    renderClineWebGL(gl, program, ocolor) {
+    renderClineWebGL(gl, program, options) {
         // Render line
-        this.renderLineWebGL(gl, program, ocolor);
+        this.renderLineWebGL(gl, program, options);
 
         // Render endpoints
-        this.renderCircleEndpoint(gl, program, this.point1, ocolor);
-        this.renderCircleEndpoint(gl, program, this.point2, ocolor);
+        this.renderCircleEndpoint(gl, program, this.point1, options);
+        this.renderCircleEndpoint(gl, program, this.point2, options);
     }
 
-    renderCircleEndpoint(gl, program, center, ocolor) {
+    renderCircleEndpoint(gl, program, center, options) {
         const prevRadius = this.radius;
         this.radius = this.width / 2;
         this.center = center;
-        this.renderCircleWebGL(gl, program, ocolor);
+        this.renderCircleWebGL(gl, program, options);
         this.radius = prevRadius;
     }
 
@@ -465,9 +488,11 @@ class DrawItem {
         ];
     }
 
-    renderCircleWebGL(gl, program, ocolor) {
+    renderCircleWebGL(gl, program, options) {
         const vertices = this.generateCircleVertices();
-        DrawItem.renderGeometry(gl, program, vertices, ocolor || this.color, gl.TRIANGLE_FAN);
+        DrawItem.renderGeometry(
+            gl, program, vertices,
+            options.m_overrideColor || this.color, gl.TRIANGLE_FAN);
     }
 
     generateCircleVertices(segments = 32) {
@@ -484,9 +509,11 @@ class DrawItem {
         return vertices;
     }
 
-    renderPolygonWebGL(gl, program, ocolor) {
+    renderPolygonWebGL(gl, program, options) {
         const vertices = DrawItem.triangulateConvexPolygon(this.points);
-        DrawItem.renderGeometry(gl, program, vertices, ocolor || this.color, gl.TRIANGLES);
+        DrawItem.renderGeometry(
+            gl, program, vertices,
+            options.m_overrideColor || this.color, gl.TRIANGLES);
     }
 
     /** @param {{x: number, y: number}[]} points */
@@ -505,9 +532,11 @@ class DrawItem {
         return vertices;
     }
 
-    renderArcWebGL(gl, program, ocolor) {
+    renderArcWebGL(gl, program, options) {
         const vertices = this.generateArcVertices();
-        DrawItem.renderGeometry(gl, program, vertices, ocolor || this.color, gl.TRIANGLE_STRIP);
+        DrawItem.renderGeometry(
+            gl, program, vertices,
+            options.m_overrideColor || this.color, gl.TRIANGLE_STRIP);
     }
 
     generateArcVertices(segments = 32) {
@@ -534,8 +563,8 @@ class DrawItem {
         return vertices;
     }
 
-    renderCompoundWebGL(gl, program, ocolor) {
-        this.shapes.forEach(shape => shape.renderingWebGL(gl, program, ocolor));
+    renderCompoundWebGL(gl, program, options) {
+        this.shapes.forEach(shape => shape.renderingWebGL(gl, program, options));
     }
 
     static renderGeometry(gl, program, vertices, xcolor, drawMode) {
@@ -588,4 +617,4 @@ function DeserializeDrawItems(str) {
 }
 
 
-export { DrawItem, SerializeDrawItems, DeserializeDrawItems };
+export { DrawItem, DrawItemWebGLOptions, SerializeDrawItems, DeserializeDrawItems };
