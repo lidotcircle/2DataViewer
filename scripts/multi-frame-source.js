@@ -88,20 +88,50 @@ class MultiFrameSource {
             const text = await resp.text();
             const lines = text.split('\n').filter(str => str.length > 0);
             const frames = [];
+            let mode = "free";
             let base = [];
-            for (const line of lines) {
-                const tokens = tokenize(line);
-                const shapes = parseTokens(tokens);
-                if (line.trim().startsWith("(base")) {
-                    // )
-                    base = shapes;
-                } else {
-                    for (const b of base) {
-                        shapes.push(b);
+            let baseText = "";
+            let sceneText = "";
+            const genBase = () => {
+                if (baseText.length > 0) {
+                    base = parseTokens(tokenize(baseText));
+                    baseText = "";
+                }
+            };
+            const genFrame = () => {
+                if (sceneText.length > 0) {
+                    const s = parseTokens(tokenize(sceneText));
+                    sceneText = "";
+                    for (const m of base) {
+                        s.push(m);
                     }
-                    frames.push(shapes);
+                    frames.push(s);
+                }
+            };
+            for (const line of lines) {
+                if (line.trim().length == 0 || line.trim().startsWith("#")) {
+                    continue;
+                } else if (line.trim().startsWith("(base")) {
+                    // )
+                    genBase();
+                    genFrame();
+                    baseText = line.trim();
+                    mode = "base";
+                } else if (line.trim().startsWith("(scene")) {
+                    genBase();
+                    genFrame();
+                    sceneText = line.trim();
+                    mode = "scene";
+                } else {
+                    if (mode == "base") {
+                        baseText += " " + line.trim() + " ";
+                    } else if (mode == "scene") {
+                        sceneText += " " + line.trim() + " ";
+                    }
                 }
             }
+            genBase();
+            genFrame();
 
             this.m_box = new BoundingBox({ x: 0, y: 0 }, { x: 200, y: 200 });
             this.m_totalFrames.val = frames.length;
