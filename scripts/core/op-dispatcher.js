@@ -2,12 +2,12 @@ import { ObjectFilter } from './object-filter.js';
 import { ObjectManager } from './object-manager.js';
 import { TransactionManager } from './transaction-manager.js';
 import { SettingManager } from '../settings.js';
-import { BoundingBox } from './common.js';
+import { AffineTransformation, BoundingBox } from './common.js';
 import {
     AbortTransactionOperation,
     BeginTransactionOperation, ClearTransactionHistoriesOperation,
     CommitTransactionOperation, ObjAddOperation, ObjClearOperation, objRemoveSelection, RedoOperation,
-    SelectionBoxOperation, SelectionClearOperation, SleepOperation, UndoOperation
+    SelectionBoxOperation, SelectionClearOperation, SleepOperation, TransformSelectedObjsOperation, UndoOperation
 } from './app-operation.js';
 import { Observable, Subject } from '../thirdparty/rxjs.js';
 
@@ -100,6 +100,12 @@ class OpDispatcher {
 
     addObjects(items) {
         const op = new ObjAddOperation(this, items);
+        this.execute(op);
+    }
+
+    moveSelectedObjects(dx, dy) {
+        const transform = AffineTransformation.translate(dx, dy);
+        const op = new TransformSelectedObjsOperation(this, transform);
         this.execute(op);
     }
 

@@ -156,6 +156,16 @@ class CommandLine {
     }
 
     /** @private */
+    cmdMove(args) {
+        const dx = parseFloat(args[0]);
+        const dy = parseFloat(args[1]);
+        if (dx == NaN || dy == NaN) {
+            throw "unexpected move offset";
+        }
+        this.m_application.OpDispatcher.moveSelectedObjects(dx, dy);
+    }
+
+    /** @private */
     cmdZoom() {
         this.m_viewport.FitScreen();
     }
@@ -308,6 +318,8 @@ class CommandLine {
                 DrawItem.plainObject2DrawItem(shapes));
         } else if (c === 'export') {
             this.cmdExport(tokens);
+        } else if (c === 'move') {
+            this.cmdMove(tokens);
         } else if (c === 'undo') {
             this.m_application.OpDispatcher.rollback();
         } else if (c === 'redo') {

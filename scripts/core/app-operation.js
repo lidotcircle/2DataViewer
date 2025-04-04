@@ -180,6 +180,31 @@ class ObjAddOperation extends AppOperation {
     }
 }
 
+class TransformSelectedObjsOperation extends AppOperation {
+    constructor(dispatcher, transformFn) {
+        super(dispatcher);
+        this.m_opName = "transform-selected-objs";
+        this.m_transformFn = transformFn;
+    }
+
+    apply() {
+        const selected = this.m_dispatcher.ObjectManager.selectedObjects;
+        const transformed = selected.map(obj => obj.cloneAndApplyTransform(this.m_transformFn));
+
+        const trans = this.m_dispatcher.TransactionManager.beginTransaction();
+        trans.RemoveItems(selected);
+        console.log(selected);
+        console.log(transformed);
+        trans.AddItems(transformed);
+        trans.commit();
+    }
+
+    serialize() {
+        // TODO
+        return { name: this.m_opName, data: null }; // Serialization logic can be extended if needed
+    }
+}
+
 /**
  * @param {{name: string, data: string}} data
  * @return {AppOperation}
@@ -209,6 +234,8 @@ function DeserializeAppOperation(dispatcher, data) {
         return new objRemoveSelection(dispatcher);
     } else if (data.name == "obj-add") {
         return new ObjAddOperation(dispatcher, DeserializeDrawItems(data.data));
+    } else if (data.name == "transform-selected-objs") {
+        console.assert(false, 'Deserialization for transform-selected-objs is not implemented');
     } else {
         console.assert(false, 'unknown operation');
     }
@@ -220,4 +247,5 @@ export {
     BeginTransactionOperation, CommitTransactionOperation, AbortTransactionOperation,
     UndoOperation, RedoOperation, ClearTransactionHistoriesOperation,
     ObjClearOperation, objRemoveSelection, ObjAddOperation,
+    TransformSelectedObjsOperation,
 };

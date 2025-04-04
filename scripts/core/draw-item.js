@@ -57,7 +57,7 @@ class DrawItem {
         const xshapes = [];
         for (let shape of shapes) {
             const s = new DrawItem(shape.type);
-            for (const key in Object.getOwnPropertyNames(shape)) {
+            for (const key of Object.getOwnPropertyNames(shape)) {
                 s[key] = shape[key];
             }
             xshapes.push(s);
@@ -100,7 +100,7 @@ class DrawItem {
     /** @private */
     deepCopyObject(obj) {
         const ans = {};
-        for (const key in Object.getOwnPropertyNames(obj)) {
+        for (const key of Object.getOwnPropertyNames(obj)) {
             const o = obj[key];
             if (o instanceof DrawItem) {
                 ans[key] = o.clone();
@@ -115,7 +115,8 @@ class DrawItem {
 
     clone() {
         const ans = new DrawItem(this.type);
-        for (const key in Object.getOwnPropertyNames(this)) {
+        const keys = Object.getOwnPropertyNames(this);
+        for (const key of keys) {
             if (key == 'm_shape') {
                 continue;
             }
@@ -137,11 +138,14 @@ class DrawItem {
         const recursiveApplyToPoint = obj => {
             if (typeof (obj) == "object" && obj !== null) {
                 const props = Object.getOwnPropertyNames(obj);
-                for (const key in props) {
+                for (const key of props) {
                     const o = obj[key];
                     if (o instanceof Shape) {
                         delete obj[key];
                         continue;
+                    } else if (typeof(o.x) == "number" && typeof(o.y) == "number") {
+                        const xy = transform.applyXY(o);
+                        obj[key] = new Point(xy.x, xy.y);
                     } else if (o instanceof Point) {
                         const xy = transform.applyXY(o);
                         obj[key] = new Point(xy.x, xy.y);
@@ -151,10 +155,11 @@ class DrawItem {
                 }
             }
         };
+        recursiveApplyToPoint(this);
     }
 
     /**
-     * @private
+     * @public
      * @param {AffineTransformation} transform
      */
     cloneAndApplyTransform(transform) {
