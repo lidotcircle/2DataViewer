@@ -4,6 +4,7 @@
 from bottle import get, run, static_file
 import argparse
 import re
+import sys
 
 
 def tokenize(input_string):
@@ -157,10 +158,10 @@ def getfonts(filepath):
     return static_file(filepath, root="fonts")
 
 
-global minCoord, maxCoord, frameOffset, openInput
+global minCoord, maxCoord, frameOffsets, openInput
 minCoord = {}
 maxCoord = {}
-frameOffset = []
+frameOffsets = []
 openInput = None
 
 
@@ -178,32 +179,37 @@ def mergePoint(p):
 
 @get("/data-info")
 def datainfo():
-    if len(frameOffset) == 0 or len(minCoord) == 0 or len(maxCoord) == 0:
+    if len(frameOffsets) == 0 or len(minCoord) == 0 or len(maxCoord) == 0:
         return {}
     else:
         return {
             "minxy": minCoord,
             "maxxy": maxCoord,
-            "nframes": len(frameOffset)
+            "nframes": len(frameOffsets)
         }
+
+
+def getShapesFromFile(offsets, openFile):
+    if len(offsets) == 0:
+        return []
+    assert (openFile is not None)
+    text = ""
+    for off in offsets:
+        openFile.seek(off)
+        text += openFile.readline().strip() + " "
+    tokens = tokenize(text)
+    return parse_tokens(tokens)
 
 
 @get("/frame/<nx>")
 def getFrame(nx):
     assert (openInput is not None)
     n = int(nx)
-    if n >= len(frameOffset):
+    if n >= len(frameOffsets):
         return {"drawings": []}
-    shapes = []
-    if frameOffset[n][1] != -1:
-        openInput.seek(frameOffset[n][1])
-        text = openInput.readline().strip()
-        tokens = tokenize(text)
-        shapes += parse_tokens(tokens)
-    openInput.seek(frameOffset[n][0])
-    text = openInput.readline().strip()
-    tokens = tokenize(text)
-    shapes += parse_tokens(tokens)
+    ok1, ok2 = frameOffsets[n]
+    shapes = getShapesFromFile(ok2, openInput) + \
+        getShapesFromFile(ok1, openInput)
     return {"drawings": shapes}
 
 
@@ -217,24 +223,45 @@ if __name__ == "__main__":
                         default=3527, help="listening port")
     args = parser.parse_args()
 
-    baseOffset = -1
+    baseOffsets = []
+    sceneOffsets = []
+    mode = "free"  # { free, base, scene }
     if args.input is not None:
         openInput = open(args.input, "r")
         while True:
             off = openInput.tell()
-            n = openInput.readline().strip()
-            if n == '':
+            line = openInput.readline()
+            n = line.strip()
+            if line == '':
                 break
-            if n.startswith("(base "):
-                baseOffset = off
+            if n == '' or n.startswith('#'):
                 continue
+            elif n.startswith("(base"):  # )
+                if len(sceneOffsets) > 0:
+                    frameOffsets.append([sceneOffsets, baseOffsets])
+                baseOffsets = [off]
+                mode = "base"
+            elif n.startswith("(scene"):  # )
+                if len(sceneOffsets) > 0:
+                    frameOffsets.append([sceneOffsets, baseOffsets])
+                sceneOffsets = [off]
+                mode = "scene"
+            elif mode == "base":
+                baseOffsets.append(off)
+            elif mode == "scene":
+                sceneOffsets.append(off)
             else:
-                frameOffset.append([off, baseOffset])
+                print("unexpected tokens '{}'".format(n), file=sys.stderr)
 
-            if (len(frameOffset) > 1):
-                continue
+        if len(sceneOffsets) > 0:
+            frameOffsets.append([sceneOffsets, baseOffsets])
+            sceneOffsets = []
+
+        if (len(frameOffsets) > 1):
+            ok1, ok2 = frameOffsets[0]
             try:
-                shapes = parse_tokens(tokenize(n))
+                shapes = getShapesFromFile(
+                    ok1, openInput) + getShapesFromFile(ok2, openInput)
                 for s in shapes:
                     if s["type"] == "circle":
                         c = s["center"]
@@ -255,6 +282,8 @@ if __name__ == "__main__":
             except Exception as e:
                 print(e)
                 pass
+
+        print("total frames = {}".format(len(frameOffsets)))
 
     if len(minCoord) == 0 or len(maxCoord) == 0:
         mergePoint({"x": 0, "y": 0})
