@@ -193,8 +193,6 @@ class TransformSelectedObjsOperation extends AppOperation {
 
         const trans = this.m_dispatcher.TransactionManager.beginTransaction();
         trans.RemoveItems(selected);
-        console.log(selected);
-        console.log(transformed);
         trans.AddItems(transformed);
         trans.commit();
     }

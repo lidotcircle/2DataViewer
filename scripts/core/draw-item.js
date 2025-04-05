@@ -99,6 +99,19 @@ class DrawItem {
 
     /** @private */
     deepCopyObject(obj) {
+        if (Array.isArray(obj)) {
+            const ans = [];
+            for (const item of obj) {
+                if (item instanceof DrawItem) {
+                    ans.push(item.clone());
+                } else if (typeof (item) == "object" && item !== null) {
+                    ans.push(this.deepCopyObject(item));
+                } else {
+                    ans.push(item);
+                }
+            }
+            return ans;
+        }
         const ans = {};
         for (const key of Object.getOwnPropertyNames(obj)) {
             const o = obj[key];
@@ -143,7 +156,7 @@ class DrawItem {
                     if (o instanceof Shape) {
                         delete obj[key];
                         continue;
-                    } else if (typeof(o.x) == "number" && typeof(o.y) == "number") {
+                    } else if (typeof(o?.x) == "number" && typeof(o?.y) == "number") {
                         const xy = transform.applyXY(o);
                         obj[key] = new Point(xy.x, xy.y);
                     } else if (o instanceof Point) {
