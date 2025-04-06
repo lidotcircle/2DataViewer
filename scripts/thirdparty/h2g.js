@@ -239,6 +239,35 @@ class Shape {
         }
     }
 
+    tessellate() {
+        const ans = [];
+        const data = this.m_obj.tessellate();
+        const buf = new Int32Array(h2g.HEAP32.buffer, data.data(), data.size());
+        const n = buf[0];
+        let remainN = 0;
+        let dx = null;
+        for (let i = 1; i < buf.length; i++) {
+            const v = buf[i];
+            if (remainN > 0) {
+                if (dx != null) {
+                    ans[ans.length - 1].push(new Point(dx, v));
+                    remainN--;
+                    dx = null;
+                } else {
+                    dx = v;
+                }
+            } else {
+                ans.push([]);
+                remainN = v;
+                console.assert(dx == null);
+            }
+        }
+        console.assert(n == ans.length);
+        console.assert(remainN == 0);
+        data.delete();
+        return ans;
+    }
+
     delete() {
         this.m_obj.delete();
         this.m_obj = null;

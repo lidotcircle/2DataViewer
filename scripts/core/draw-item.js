@@ -156,7 +156,7 @@ class DrawItem {
                     if (o instanceof Shape) {
                         delete obj[key];
                         continue;
-                    } else if (typeof(o?.x) == "number" && typeof(o?.y) == "number") {
+                    } else if (typeof (o?.x) == "number" && typeof (o?.y) == "number") {
                         const xy = transform.applyXY(o);
                         obj[key] = new Point(xy.x, xy.y);
                     } else if (o instanceof Point) {
@@ -556,7 +556,12 @@ class DrawItem {
     }
 
     renderPolygonWebGL(gl, program, options) {
-        const vertices = DrawItem.triangulateConvexPolygon(this.points);
+        const subPolygons = this.shape().tessellate();
+        const vertices = [];
+        for (const points of subPolygons) {
+            const vxs = DrawItem.triangulateConvexPolygon(points);
+            vertices.push(...vxs);
+        }
         DrawItem.renderGeometry(
             gl, program, vertices,
             options.m_overrideColor || this.color, gl.TRIANGLES);
