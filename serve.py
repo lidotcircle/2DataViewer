@@ -5,6 +5,7 @@ from bottle import get, run, static_file
 import argparse
 import re
 import sys
+from urllib.parse import unquote
 
 
 def tokenize(input_string):
@@ -49,6 +50,9 @@ def parse_tokens(tokens):
     def top_token():
         return token_at(0)
 
+    def decodeStr(xstr):
+        return unquote(xstr.encode(encoding='utf-8'))
+
     def parse_shape():
         shape = {"type": next_token()}
         if shape["type"] == "compound":
@@ -76,10 +80,10 @@ def parse_tokens(tokens):
                     t = next_token().strip('"')
                     value = t == "true"
                 elif key in ['color', 'comment', 'layer']:
-                    value = next_token().strip('"')
+                    value = decodeStr(next_token().strip('"'))
                 elif key in ['attr']:
-                    name = next_token()
-                    value = next_token().strip('"')
+                    name = decodeStr(next_token())
+                    value = decodeStr(next_token().strip('"'))
                     if name not in shape:
                         shape[name] = value
                     next_token()  # Consume ')'
