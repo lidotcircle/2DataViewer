@@ -139,6 +139,11 @@ class CommandLine {
         this.m_show.val = false;
     }
 
+    showError(msg) {
+        // TODO
+        console.error(msg);
+    }
+
     cmdApplyTransform(trans) {
         this.m_application.m_viewport.ApplyTransformToGlobal(trans);
     }
@@ -284,14 +289,16 @@ class CommandLine {
 
     /** @private */
     evalCommand(cmd) {
+        let success = true;
         try {
             this.ExecuteCommand(cmd);
         } catch (err) {
-            return;
+            success = false;
+            console.log(err);
         }
 
-        if (this.m_cmdHistories.length == 0 ||
-            this.m_cmdHistories[this.m_cmdHistories.length - 1] != cmd) {
+        if (success && (this.m_cmdHistories.length == 0 ||
+            this.m_cmdHistories[this.m_cmdHistories.length - 1] != cmd)) {
             this.m_cmdHistories.push(cmd);
             localStorage.setItem('cmdHistories', JSON.stringify(this.m_cmdHistories));
         }
