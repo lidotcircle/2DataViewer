@@ -1,6 +1,7 @@
-import { genStyle, text2htmlElement } from "./core/common.js";
+import { BoundingBox, Box2boxTransformation, genStyle, PointSub, text2htmlElement } from "./core/common.js";
 import van from "./thirdparty/van.js";
 import jss from "./thirdparty/jss.js";
+import { AnimatedTransformation } from "./animation.js";
 
 
 const closeIcon = `
@@ -46,6 +47,16 @@ const maximizeIconHover = `
 </svg>
 `;
 
+const maximizeRecoverIconHover = `
+<svg viewBox="0 0 12 12" width="12" height="12" preserveAspectRatio="xMidYMid meet">
+<circle cx="6" cy="6" r="5.5" fill="#27c93f" stroke="#1aab29" stroke-width="0.5"/>
+<!-- Top-left triangle (pointing outward) -->
+<path d="M2,5.5 L5.5,5.5 L5.5,2 Z" fill="#006400" stroke="#006400" stroke-width="0.8"/>
+<!-- Bottom-right triangle (pointing outward) -->
+<path d="M6.5,6.5 L6.5,10 L10,6.5 Z" fill="#006400" stroke="#006400" stroke-width="0.8"/>
+</svg>
+`;
+
 class Dragger {
     constructor(children, options = {}) {
         this.children = children;
@@ -56,6 +67,12 @@ class Dragger {
             resizeHandleSize: 6,
             minWidth: 50,
             minHeight: 50,
+            minimizeTarget: null,
+            draggable: true,
+            resizable: true,
+            closeIcon: true,
+            minimizeIcon: true,
+            maximizeIcon: true,
             ...options
         };
 
@@ -67,6 +84,9 @@ class Dragger {
         this.startHeight = 0;
         this.startLeft = 0;
         this.startTop = 0;
+
+        this.m_show = van.state(true);
+        this.m_maximized = van.state(false);
 
         /** 
           * @private
@@ -114,16 +134,18 @@ class Dragger {
                 "flex-grow": "1",
                 "min-width": "1em",
                 "min-height": "1em",
-                "cursor": "move",
+                "cursor": this.options.draggable ? "move" : "default",
             },
             controlBarContainer: {
                 position: "relative",
+                display: 'flex',
+                'flex-direction': 'row',
 
                 "& .hoverShow": {
                     display: "none",
                 },
                 "&:hover .hoverShow": {
-                    display: "block",
+                    display: "flex",
                 }
             },
             controlBar: {
@@ -158,6 +180,14 @@ class Dragger {
     }
 
     handleDragStart(e) {
+        if (!this.options.draggable) {
+            return;
+        }
+
+        if (this.m_maximized.val) {
+            return;
+        }
+
         // Only left mouse button
         if (e.button !== 0) return;
 
@@ -182,6 +212,8 @@ class Dragger {
 
         this.element.style.left = `${this.startLeft + dx}px`;
         this.element.style.top = `${this.startTop + dy}px`;
+
+        this.storeShape();
     }
 
     handleDragEnd() {
@@ -190,6 +222,14 @@ class Dragger {
     }
 
     handleResizeStart(e, direction) {
+        if (!this.options.resizable) {
+            return;
+        }
+
+        if (this.m_maximized.val) {
+            return;
+        }
+
         this.resizeDirection = direction;
         this.startX = e.clientX;
         this.startY = e.clientY;
@@ -243,6 +283,7 @@ class Dragger {
         this.element.style.height = `${newHeight}px`;
         this.element.style.left = `${newLeft}px`;
         this.element.style.top = `${newTop}px`;
+        this.storeShape();
     }
 
     handleResizeEnd() {
@@ -264,9 +305,14 @@ class Dragger {
             this.destroy();
         }
 
+        if (!this.m_show.val) {
+            return van.tags.div();
+        }
+
         let _closeIconHover = text2htmlElement(closeIconHover);
         let _minimizeIconHover = text2htmlElement(minimizeIconHover);
         let _maximizeIconHover = text2htmlElement(maximizeIconHover);
+        let _recoverMaxIconHover = text2htmlElement(maximizeRecoverIconHover);
         let _closeIcon = text2htmlElement(closeIcon);
         let _minimizeIcon = text2htmlElement(minimizeIcon);
         let _maximizeIcon = text2htmlElement(maximizeIcon);
@@ -290,7 +336,7 @@ class Dragger {
                         width: '100%',
                         height: '10%',
                         'max-height': '2em',
-                        cursor: 'nwse-resize',
+                        cursor: this.options.resizable ? 'nwse-resize' : 'default',
                     }),
                     onmousedown: (e) => {
                         e.stopPropagation();
@@ -301,7 +347,7 @@ class Dragger {
                     style: genStyle({
                         'flex-grow': '1',
                         height: '100%',
-                        cursor: 'ew-resize',
+                        cursor: this.options.resizable ? 'ew-resize' : 'default',
                     }),
                     onmousedown: (e) => {
                         e.stopPropagation();
@@ -313,7 +359,7 @@ class Dragger {
                         width: '100%',
                         height: '10%',
                         'max-height': '2em',
-                        cursor: 'nesw-resize',
+                        cursor: this.options.resizable ? 'nesw-resize' : 'default',
                     }),
                     onmousedown: (e) => {
                         e.stopPropagation();
@@ -336,7 +382,7 @@ class Dragger {
                             width: '10%',
                             height: '100%',
                             'max-width': '2em',
-                            cursor: 'nwse-resize',
+                            cursor: this.options.resizable ? 'nwse-resize' : 'default',
                         }),
                         onmousedown: (e) => {
                             e.stopPropagation();
@@ -347,7 +393,7 @@ class Dragger {
                         style: genStyle({
                             'flex-grow': '1',
                             height: '100%',
-                            cursor: 'ns-resize',
+                            cursor: this.options.resizable ? 'ns-resize' : 'default',
                         }),
                         onmousedown: (e) => {
                             e.stopPropagation();
@@ -359,7 +405,7 @@ class Dragger {
                             width: '10%',
                             height: '100%',
                             'max-width': '2em',
-                            cursor: 'nesw-resize',
+                            cursor: this.options.resizable ? 'nesw-resize' : 'default',
                         }),
                         onmousedown: (e) => {
                             e.stopPropagation();
@@ -370,8 +416,20 @@ class Dragger {
                 van.tags.div({ class: this.classes.innerWindowx },
                     van.tags.div({ class: this.classes.toolbar },
                         van.tags.div({ class: this.classes.controlBarContainer, },
-                            van.tags.div({ class: "hoverShow " + this.classes.hoverControlBar }, _closeIconHover, _minimizeIconHover, _maximizeIconHover),
-                            van.tags.div({ class: this.classes.controlBar }, _closeIcon, _minimizeIcon, _maximizeIcon)
+                            van.tags.div({ class: "hoverShow " + this.classes.hoverControlBar },
+                                this.options.closeIcon ? van.tags.div({ onclick: () => this.hide() }, _closeIconHover) : null,
+                                this.options.minimizeIcon ? van.tags.div({ onclick: () => this.minimize() }, _minimizeIconHover) : null,
+                                this.options.maximizeIcon ? van.tags.div(
+                                    { onclick: () => this.m_maximized.val ? this.undoMaximize() : this.maximize() },
+                                    this.m_maximized.val ? _recoverMaxIconHover : _maximizeIconHover
+                                ) : null,
+                            ),
+                            van.tags.div(
+                                { class: this.classes.controlBar },
+                                this.options.closeIcon ? _closeIcon : null,
+                                this.options.minimizeIcon ? _minimizeIcon : null,
+                                this.options.maximizeIcon ? _maximizeIcon : null,
+                            )
                         ),
                         dragArea),
                     van.tags.div({ class: this.classes.childrenContainer + extraChildrenContainerClass }, [...this.children])
@@ -393,7 +451,7 @@ class Dragger {
                             width: '10%',
                             height: '100%',
                             'max-width': '2em',
-                            cursor: 'nesw-resize',
+                            cursor: this.options.resizable ? 'nesw-resize' : 'default',
                         }),
                         onmousedown: (e) => {
                             e.stopPropagation();
@@ -404,7 +462,7 @@ class Dragger {
                         style: genStyle({
                             'flex-grow': '1',
                             height: '100%',
-                            cursor: 'ns-resize',
+                            cursor: this.options.resizable ? 'ns-resize' : 'default',
                         }),
                         onmousedown: (e) => {
                             e.stopPropagation();
@@ -416,7 +474,7 @@ class Dragger {
                             width: '10%',
                             height: '100%',
                             'max-width': '2em',
-                            cursor: 'nwse-resize',
+                            cursor: this.options.resizable ? 'nwse-resize' : 'default',
                         }),
                         onmousedown: (e) => {
                             e.stopPropagation();
@@ -438,7 +496,7 @@ class Dragger {
                         width: '100%',
                         height: '10%',
                         'max-height': '2em',
-                        cursor: 'nesw-resize',
+                        cursor: this.options.resizable ? 'nesw-resize' : 'default',
                     }),
                     onmousedown: (e) => {
                         e.stopPropagation();
@@ -449,7 +507,7 @@ class Dragger {
                     style: genStyle({
                         'flex-grow': '1',
                         height: '100%',
-                        cursor: 'ew-resize',
+                        cursor: this.options.resizable ? 'ew-resize' : 'default',
                     }),
                     onmousedown: (e) => {
                         e.stopPropagation();
@@ -461,7 +519,7 @@ class Dragger {
                         width: '100%',
                         height: '10%',
                         'max-height': '2em',
-                        cursor: 'nwse-resize',
+                        cursor: this.options.resizable ? 'nwse-resize' : 'default',
                     }),
                     onmousedown: (e) => {
                         e.stopPropagation();
@@ -477,7 +535,112 @@ class Dragger {
             this.element.style.minHeight = this.options.minHeight;
         }
         this.init();
+        this.restoreShape();
         return this.element;
+    }
+
+    show() {
+        this.m_show.val = true;
+    }
+
+    hide() {
+        this.m_show.val = false;
+    }
+
+    toggleVisibility() {
+        this.m_show.val = !this.m_show.val;
+    }
+
+    storeShape() {
+        this.keepState = {
+            top: this.element.style.top,
+            left: this.element.style.left,
+            width: this.element.style.width,
+            height: this.element.style.height,
+        };
+    }
+
+    restoreShape() {
+        if (!this.keepState) {
+            return;
+        }
+        const { top, left, width, height } = this.keepState;
+        this.element.style.top = top;
+        this.element.style.left = left;
+        this.element.style.width = width;
+        this.element.style.height = height;
+    }
+
+    async maximize() {
+        if (!this.element) {
+            return;
+        }
+
+        this.oldState = {
+            top: this.element.style.top,
+            left: this.element.style.left,
+            width: this.element.style.width,
+            height: this.element.style.height,
+        };
+
+        this.element.style.top = "-" + this.options.resizeHandleSize + "px";
+        this.element.style.left = "-" + this.options.resizeHandleSize + "px";
+        const w = window.document.body.clientWidth + 2 * this.options.resizeHandleSize;
+        const h = window.document.body.clientHeight + 2 * this.options.resizeHandleSize;
+        this.element.style.width = `${w}px`;
+        this.element.style.height = `${h}px`;
+        this.m_maximized.val = true;
+        this.storeShape();
+        this.show();
+    }
+
+    async undoMaximize() {
+        const { top, left, width, height } = this.oldState;
+        this.element.style.top = top;
+        this.element.style.left = left;
+        this.element.style.width = width;
+        this.element.style.height = height;
+        this.m_maximized.val = false;
+        this.storeShape();
+        this.show();
+    }
+
+    async minimize() {
+        if (!this.element) {
+            return;
+        }
+        this.storeShape();
+
+        const targetBox = (() => {
+            if (this.options.minimizeTarget instanceof HTMLElement) {
+                const { x, y, width, height } = this.options.minimizeTarget.getBoundingClientRect();
+                return new BoundingBox({ x, y }, { x: x + width, y: y + height });
+            } else if (this.options.minimizeTarget instanceof Function) {
+                const box = this.options.minimizeTarget();
+                if (box instanceof BoundingBox) {
+                    return box;
+                }
+            }
+
+            {
+                const w = window.document.body.clientWidth;
+                const h = window.document.body.clientHeight;
+                const g = Math.min(w, h) / 20;
+                const x = (w - g) / 2;
+                const y = h - g;
+                return new BoundingBox({ x, y }, { x: x + g, y: y + g });
+            }
+        })();
+
+        const { x, y, width, height } = this.element.getBoundingClientRect();
+        const a = PointSub(targetBox.getBL(), { x: x + width / 2, y: y + height / 2 });
+        const b = PointSub(targetBox.getTR(), { x: x + width / 2, y: y + height / 2 });
+        const fromBox = new BoundingBox({ x: -width / 2, y: -height / 2 }, { x: width / 2, y: height / 2 });
+        const toBox = new BoundingBox(a, b);
+
+        const transform = Box2boxTransformation(fromBox, toBox);
+        await AnimatedTransformation(this.element, transform, 300, true, "cubic-bezier(0.175, 0.885, 0.32, 1.005)");
+        this.hide();
     }
 }
 

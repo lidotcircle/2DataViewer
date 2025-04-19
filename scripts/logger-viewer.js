@@ -23,7 +23,6 @@ class LoggerViewer {
                 border: '1px solid #ccc',
                 borderRadius: '4px',
                 padding: '10px',
-                maxHeight: '300px',
                 overflowY: 'auto',
                 backgroundColor: '#f8f8f8'
             },

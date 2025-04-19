@@ -76,6 +76,23 @@ class Application {
         /** @private */
         this.m_settingManager = new SettingManager();
 
+        this.m_logger = new LoggerViewer();
+        const loggerDraggerOptions = {
+            closeIcon: true,
+            minimizeIcon: true,
+            maximizeIcon: true,
+            draggable: true,
+            resizable: true,
+        };
+        loggerDraggerOptions.minimizeTarget = () => {
+            if (this.m_logoButton) {
+                const { x, y, width, height } = this.m_logoButton.getBoundingClientRect();
+                return new BoundingBox({ x, y }, { x: x + width, y: y + height });
+            }
+            return null;
+        };
+        this.m_loggerDragger = new Dragger(this.m_logger, loggerDraggerOptions);
+
         const viewports = [];
         viewports.push(new Viewport(null, this.m_settingManager));
         // viewports.push(new Viewport());
@@ -379,16 +396,19 @@ class Application {
         logo.classList.add("logo-light");
         logo_dark.classList.add("logo-dark");
 
+        this.m_logoButton =
+            Van.tags.button({
+                class: this.m_classes.logo,
+                onclick: e => {
+                    e.currentTarget.blur();
+                    // TODO
+                }
+            }, logo, logo_dark);
+
         return Van.tags.div({ class: this.m_classes.container },
             Van.tags.div(
                 { class: this.m_classes.menuBar },
-                Van.tags.button({
-                    class: this.m_classes.logo, 
-                    onclick: e => {
-                        e.currentTarget.blur();
-                        // TODO
-                    }
-                }, logo, logo_dark)
+                this.m_logoButton,
             ),
             // () => {
             //     return Van.tags.div({ class: this.m_classes.title }, Van.tags.h1("2D Data Viewer"));

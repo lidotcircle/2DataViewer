@@ -82,6 +82,24 @@ class AffineTransformation {
         return new AffineTransformation(sx, 0, 0, sy, 0, 0);
     }
 
+    /**
+     * @param {string} matrix
+     */
+    static fromCSSMatrix(matrix) {
+        matrix = matrix.trim();
+        if (matrix.startsWith('matrix(') && matrix.endsWith(')')) {
+            const m = matrix.substring(7);
+            if (m.length > 1) {
+                const kx = m.substring(0, m.length - 1).split(',');
+                if (kx.length == 6) {
+                    const [a, c, d, b, tx, ty] = kx.map(x => parseFloat(x));
+                    return new AffineTransformation(a, b, c, d, tx, ty);
+                }
+            }
+        }
+        return AffineTransformation.identity();
+    }
+
     linearComponent() {
         return new AffineTransformation(this.a, this.b, this.c, this.d, 0, 0);
     }
