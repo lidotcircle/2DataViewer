@@ -53,15 +53,13 @@ class Dragger {
             this.children = [this.children];
         }
         this.options = {
-            dragHandle: null,
-            resizeHandleSize: 8,
+            resizeHandleSize: 6,
             minWidth: 50,
             minHeight: 50,
             ...options
         };
 
         this.isDragging = false;
-        this.isResizing = false;
         this.resizeDirection = null;
         this.startX = 0;
         this.startY = 0;
@@ -77,6 +75,47 @@ class Dragger {
         this.element = null;
 
         const { classes } = jss.createStyleSheet({
+            windowx: {
+                "position": 'absolute',
+                display: 'flex',
+                'flex-direction': 'row',
+            },
+            windowh: {
+                'flex-grow': 1,
+                display: 'flex',
+                'flex-direction': 'column',
+            },
+            innerWindowx: {
+                "position": 'relative',
+                "user-select": 'none',
+                "touch-action": 'none',
+                background: "#eee",
+                "border-top-left-radius": "0.3em",
+                "border-top-right-radius": "0.3em",
+                'flex-grow': 1,
+                display: 'flex',
+                'flex-direction': 'column',
+            },
+            childrenContainer: {
+                'flex-grow': '1',
+            },
+            childrenContainerSingleChildren: {
+                '& > div': {
+                    height: '100%',
+                    width: '100%',
+                }
+            },
+            toolbar: {
+                padding: "0.2em 0em 0.1em 0.3em",
+                display: "flex",
+                "flex-direction": "row",
+            },
+            dragArea: {
+                "flex-grow": "1",
+                "min-width": "1em",
+                "min-height": "1em",
+                "cursor": "move",
+            },
             controlBarContainer: {
                 position: "relative",
 
@@ -103,90 +142,17 @@ class Dragger {
     }
 
     init() {
-        // Create drag handle or use the element itself
-        this.dragHandle = this.options.dragHandle
-            ? this.element.querySelector(this.options.dragHandle)
-            : this.element;
-
-        // Set up event listeners
         this.setupDrag();
         this.setupResize();
     }
 
     setupDrag() {
-        this.dragHandle.addEventListener('mousedown', this.handleDragStart.bind(this));
+        this.m_dragger.addEventListener('mousedown', this.handleDragStart.bind(this));
         document.addEventListener('mousemove', this.handleDragMove.bind(this));
         document.addEventListener('mouseup', this.handleDragEnd.bind(this));
     }
 
     setupResize() {
-        // Create resize handles if they don't exist
-        if (!this.element.querySelector('.resize-handle')) {
-            const directions = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
-            directions.forEach(dir => {
-                const handle = document.createElement('div');
-                handle.className = `resize-handle resize-${dir}`;
-                handle.style.position = 'absolute';
-                handle.style.width = `${this.options.resizeHandleSize}px`;
-                handle.style.height = `${this.options.resizeHandleSize}px`;
-
-                // Position each handle
-                switch (dir) {
-                    case 'n':
-                        handle.style.top = '0';
-                        handle.style.left = '50%';
-                        handle.style.transform = 'translateX(-50%)';
-                        handle.style.cursor = 'ns-resize';
-                        break;
-                    case 'ne':
-                        handle.style.top = '0';
-                        handle.style.right = '0';
-                        handle.style.cursor = 'ne-resize';
-                        break;
-                    case 'e':
-                        handle.style.top = '50%';
-                        handle.style.right = '0';
-                        handle.style.transform = 'translateY(-50%)';
-                        handle.style.cursor = 'ew-resize';
-                        break;
-                    case 'se':
-                        handle.style.bottom = '0';
-                        handle.style.right = '0';
-                        handle.style.cursor = 'se-resize';
-                        break;
-                    case 's':
-                        handle.style.bottom = '0';
-                        handle.style.left = '50%';
-                        handle.style.transform = 'translateX(-50%)';
-                        handle.style.cursor = 'ns-resize';
-                        break;
-                    case 'sw':
-                        handle.style.bottom = '0';
-                        handle.style.left = '0';
-                        handle.style.cursor = 'sw-resize';
-                        break;
-                    case 'w':
-                        handle.style.top = '50%';
-                        handle.style.left = '0';
-                        handle.style.transform = 'translateY(-50%)';
-                        handle.style.cursor = 'ew-resize';
-                        break;
-                    case 'nw':
-                        handle.style.top = '0';
-                        handle.style.left = '0';
-                        handle.style.cursor = 'nw-resize';
-                        break;
-                }
-
-                handle.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                    this.handleResizeStart(e, dir);
-                });
-
-                this.element.appendChild(handle);
-            });
-        }
-
         document.addEventListener('mousemove', this.handleResizeMove.bind(this));
         document.addEventListener('mouseup', this.handleResizeEnd.bind(this));
     }
@@ -204,7 +170,7 @@ class Dragger {
         this.startLeft = rect.left;
         this.startTop = rect.top;
 
-        this.element.style.cursor = 'grabbing';
+        this.m_dragger.style.cursor = 'grabbing';
         e.preventDefault();
     }
 
@@ -220,11 +186,10 @@ class Dragger {
 
     handleDragEnd() {
         this.isDragging = false;
-        this.element.style.cursor = '';
+        this.m_dragger.style.cursor = '';
     }
 
     handleResizeStart(e, direction) {
-        this.isResizing = true;
         this.resizeDirection = direction;
         this.startX = e.clientX;
         this.startY = e.clientY;
@@ -239,33 +204,41 @@ class Dragger {
     }
 
     handleResizeMove(e) {
-        if (!this.isResizing) return;
+        if (!this.resizeDirection) return;
 
         const dx = e.clientX - this.startX;
         const dy = e.clientY - this.startY;
+        const [deltaX, deltaY] = this.resizeDirection;
 
-        let newWidth = this.startWidth;
-        let newHeight = this.startHeight;
+        let deltaW = dx * deltaX, deltaH = dy * deltaY;
+        if (deltaW + this.startWidth < this.options.minWidth) {
+            const m = this.options.minWidth - this.startWidth;
+            if (m * deltaW > 0) {
+                deltaW = m;
+            } else {
+                deltaW = 0;
+            }
+        }
+        if (deltaH + this.startHeight < this.options.minHeight) {
+            const m = this.options.minHeight - this.startHeight;
+            if (m * deltaH > 0) {
+                deltaH = m;
+            } else {
+                deltaH = 0;
+            }
+        }
+
+        const newWidth = this.startWidth + deltaW;
+        const newHeight = this.startHeight + deltaH;
         let newLeft = this.startLeft;
         let newTop = this.startTop;
-
-        // Handle different resize directions
-        if (this.resizeDirection.includes('e')) {
-            newWidth = Math.max(this.options.minWidth, this.startWidth + dx);
+        if (deltaX < 0) {
+            newLeft = newLeft - deltaW;
         }
-        if (this.resizeDirection.includes('w')) {
-            newWidth = Math.max(this.options.minWidth, this.startWidth - dx);
-            newLeft = this.startLeft + dx;
-        }
-        if (this.resizeDirection.includes('s')) {
-            newHeight = Math.max(this.options.minHeight, this.startHeight + dy);
-        }
-        if (this.resizeDirection.includes('n')) {
-            newHeight = Math.max(this.options.minHeight, this.startHeight - dy);
-            newTop = this.startTop + dy;
+        if (deltaY < 0) {
+            newTop = newTop - deltaH;
         }
 
-        // Apply changes
         this.element.style.width = `${newWidth}px`;
         this.element.style.height = `${newHeight}px`;
         this.element.style.left = `${newLeft}px`;
@@ -273,27 +246,22 @@ class Dragger {
     }
 
     handleResizeEnd() {
-        this.isResizing = false;
         this.resizeDirection = null;
     }
 
     destroy() {
-        // Clean up event listeners
-        this.dragHandle.removeEventListener('mousedown', this.handleDragStart);
-        document.removeEventListener('mousemove', this.handleDragMove);
-        document.removeEventListener('mouseup', this.handleDragEnd);
-
-        document.removeEventListener('mousemove', this.handleResizeMove);
-        document.removeEventListener('mouseup', this.handleResizeEnd);
-
-        // Remove resize handles
-        const handles = this.element.querySelectorAll('.resize-handle');
-        handles.forEach(handle => handle.remove());
+        if (this.m_dragger) {
+            this.m_dragger.removeEventListener('mousedown', this.handleDragStart);
+            document.removeEventListener('mousemove', this.handleDragMove);
+            document.removeEventListener('mouseup', this.handleDragEnd);
+            document.removeEventListener('mousemove', this.handleResizeMove);
+            document.removeEventListener('mouseup', this.handleResizeEnd);
+        }
     }
 
     render(dom) {
         if (dom) {
-            // this.destroy();
+            this.destroy();
         }
 
         let _closeIconHover = text2htmlElement(closeIconHover);
@@ -303,19 +271,212 @@ class Dragger {
         let _minimizeIcon = text2htmlElement(minimizeIcon);
         let _maximizeIcon = text2htmlElement(maximizeIcon);
 
-        this.element = van.tags.div(
-            {
-                style: genStyle({
-                    "position": 'absolute',
-                    "user-select": 'none',
-                    "touch-action": 'none',
+        const dragArea = van.tags.div({ class: this.classes.dragArea }, "");
+        this.m_dragger = dragArea;
+        const extraChildrenContainerClass = this.children.length == 1 ? ' ' + this.classes.childrenContainerSingleChildren : '';
+
+        const resizerSize = this.options.resizeHandleSize || 5;
+        this.element = van.tags.div({ class: this.classes.windowx },
+            van.tags.div(
+                {
+                    style: genStyle({
+                        width: resizerSize + 'px',
+                        display: 'flex',
+                        'flex-direction': 'column',
+                    })
+                },
+                van.tags.div({
+                    style: genStyle({
+                        width: '100%',
+                        height: '10%',
+                        'max-height': '2em',
+                        cursor: 'nwse-resize',
+                    }),
+                    onmousedown: (e) => {
+                        e.stopPropagation();
+                        this.handleResizeStart(e, [-1, -1]);
+                    },
+                }),
+                van.tags.div({
+                    style: genStyle({
+                        'flex-grow': '1',
+                        height: '100%',
+                        cursor: 'ew-resize',
+                    }),
+                    onmousedown: (e) => {
+                        e.stopPropagation();
+                        this.handleResizeStart(e, [-1, 0]);
+                    },
+                }),
+                van.tags.div({
+                    style: genStyle({
+                        width: '100%',
+                        height: '10%',
+                        'max-height': '2em',
+                        cursor: 'nesw-resize',
+                    }),
+                    onmousedown: (e) => {
+                        e.stopPropagation();
+                        this.handleResizeStart(e, [-1, 1]);
+                    },
                 })
-            },
-            van.tags.div({ class: this.classes.controlBarContainer, },
-                van.tags.div({ class: "hoverShow " + this.classes.hoverControlBar }, _closeIconHover, _minimizeIconHover, _maximizeIconHover),
-                van.tags.div({ class: this.classes.controlBar }, _closeIcon, _minimizeIcon, _maximizeIcon)
             ),
-            van.tags.div({}, [...this.children]));
+            van.tags.div({ class: this.classes.windowh },
+                van.tags.div(
+                    {
+                        style: genStyle({
+                            height: resizerSize + 'px',
+                            width: '100%',
+                            display: 'flex',
+                            'flex-direction': 'row',
+                        })
+                    },
+                    van.tags.div({
+                        style: genStyle({
+                            width: '10%',
+                            height: '100%',
+                            'max-width': '2em',
+                            cursor: 'nwse-resize',
+                        }),
+                        onmousedown: (e) => {
+                            e.stopPropagation();
+                            this.handleResizeStart(e, [-1, -1]);
+                        },
+                    }),
+                    van.tags.div({
+                        style: genStyle({
+                            'flex-grow': '1',
+                            height: '100%',
+                            cursor: 'ns-resize',
+                        }),
+                        onmousedown: (e) => {
+                            e.stopPropagation();
+                            this.handleResizeStart(e, [0, -1]);
+                        },
+                    }),
+                    van.tags.div({
+                        style: genStyle({
+                            width: '10%',
+                            height: '100%',
+                            'max-width': '2em',
+                            cursor: 'nesw-resize',
+                        }),
+                        onmousedown: (e) => {
+                            e.stopPropagation();
+                            this.handleResizeStart(e, [1, -1]);
+                        },
+                    })
+                ),
+                van.tags.div({ class: this.classes.innerWindowx },
+                    van.tags.div({ class: this.classes.toolbar },
+                        van.tags.div({ class: this.classes.controlBarContainer, },
+                            van.tags.div({ class: "hoverShow " + this.classes.hoverControlBar }, _closeIconHover, _minimizeIconHover, _maximizeIconHover),
+                            van.tags.div({ class: this.classes.controlBar }, _closeIcon, _minimizeIcon, _maximizeIcon)
+                        ),
+                        dragArea),
+                    van.tags.div({ class: this.classes.childrenContainer + extraChildrenContainerClass }, [...this.children])
+                ),
+                van.tags.div(
+                    {
+                        style: genStyle({
+                            // position: 'absolute',
+                            top: '0em',
+                            leftr: '0em',
+                            height: resizerSize + 'px',
+                            width: '100%',
+                            display: 'flex',
+                            'flex-direction': 'row',
+                        })
+                    },
+                    van.tags.div({
+                        style: genStyle({
+                            width: '10%',
+                            height: '100%',
+                            'max-width': '2em',
+                            cursor: 'nesw-resize',
+                        }),
+                        onmousedown: (e) => {
+                            e.stopPropagation();
+                            this.handleResizeStart(e, [-1, 1]);
+                        },
+                    }),
+                    van.tags.div({
+                        style: genStyle({
+                            'flex-grow': '1',
+                            height: '100%',
+                            cursor: 'ns-resize',
+                        }),
+                        onmousedown: (e) => {
+                            e.stopPropagation();
+                            this.handleResizeStart(e, [0, 1]);
+                        },
+                    }),
+                    van.tags.div({
+                        style: genStyle({
+                            width: '10%',
+                            height: '100%',
+                            'max-width': '2em',
+                            cursor: 'nwse-resize',
+                        }),
+                        onmousedown: (e) => {
+                            e.stopPropagation();
+                            this.handleResizeStart(e, [1, 1]);
+                        },
+                    })
+                )
+            ),
+            van.tags.div(
+                {
+                    style: genStyle({
+                        width: resizerSize + 'px',
+                        display: 'flex',
+                        'flex-direction': 'column',
+                    })
+                },
+                van.tags.div({
+                    style: genStyle({
+                        width: '100%',
+                        height: '10%',
+                        'max-height': '2em',
+                        cursor: 'nesw-resize',
+                    }),
+                    onmousedown: (e) => {
+                        e.stopPropagation();
+                        this.handleResizeStart(e, [1, -1]);
+                    },
+                }),
+                van.tags.div({
+                    style: genStyle({
+                        'flex-grow': '1',
+                        height: '100%',
+                        cursor: 'ew-resize',
+                    }),
+                    onmousedown: (e) => {
+                        e.stopPropagation();
+                        this.handleResizeStart(e, [1, 0]);
+                    },
+                }),
+                van.tags.div({
+                    style: genStyle({
+                        width: '100%',
+                        height: '10%',
+                        'max-height': '2em',
+                        cursor: 'nwse-resize',
+                    }),
+                    onmousedown: (e) => {
+                        e.stopPropagation();
+                        this.handleResizeStart(e, [1, 1]);
+                    },
+                })
+            ),
+        );
+        if (this.options.minWidth) {
+            this.element.style.minWidth = this.options.minWidth;
+        }
+        if (this.options.minHeight) {
+            this.element.style.minHeight = this.options.minHeight;
+        }
+        this.init();
         return this.element;
     }
 }

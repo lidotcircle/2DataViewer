@@ -98,6 +98,8 @@ class Application {
                 flexDirection: 'column',
                 width: '100%',
                 height: '100%',
+                position: 'relative',
+                overflow: 'hidden',
             },
             title: {
                 background: "#333",
@@ -128,9 +130,28 @@ class Application {
                 "flex-direction": "row",
                 "justify-content": "end",
                 "padding": "0.2em",
+                background: 'transparent',
+                border: 'none',
+                margin: '0.2em',
+
+                '&:focus': {
+                    outline: '#4b90f6 1pt solid',
+                },
+
+                "&:hover > .logo-dark": {
+                    display: 'none',
+                },
+
+                "&:hover > .logo-light": {
+                    display: 'block',
+                },
+
+                "& > .logo-light": {
+                    display: 'none',
+                },
 
                 "& svg": {
-                    width: "1.5em",
+                    width: "2em",
                     height: "100%",
                 }
 
@@ -353,11 +374,21 @@ class Application {
             extraVPs.push(Van.tags.div({ class: this.m_classes.extraViewport }, this.m_viewport.elements[1]));
         }
 
-        const logo = text2htmlElement(logo_svg("#555", "#AAA"));
+        const logo_dark = text2htmlElement(logo_svg("#555", "#AAA"));
+        const logo = text2htmlElement(logo_svg());
+        logo.classList.add("logo-light");
+        logo_dark.classList.add("logo-dark");
+
         return Van.tags.div({ class: this.m_classes.container },
             Van.tags.div(
                 { class: this.m_classes.menuBar },
-                Van.tags.div({ class: this.m_classes.logo }, logo)
+                Van.tags.button({
+                    class: this.m_classes.logo, 
+                    onclick: e => {
+                        e.currentTarget.blur();
+                        // TODO
+                    }
+                }, logo, logo_dark)
             ),
             // () => {
             //     return Van.tags.div({ class: this.m_classes.title }, Van.tags.h1("2D Data Viewer"));
