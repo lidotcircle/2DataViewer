@@ -3,7 +3,7 @@ import { SettingManager } from './settings.js';
 import { Viewport } from './viewport.js';
 import { Subject } from './thirdparty/rxjs.js';
 import { DrawItem } from './core/draw-item.js';
-import { AffineTransformation, BoundingBox, text2htmlElement } from './core/common.js';
+import { BoundingBox, text2htmlElement } from './core/common.js';
 import { MultiFrameSource } from './multi-frame-source.js';
 import Van from './thirdparty/van.js';
 import jss from './thirdparty/jss.js';
@@ -11,6 +11,9 @@ import { CommandLine } from './command-line.js';
 import { OpDispatcher } from './core/op-dispatcher.js';
 import { ViewportWebGL } from './viewportWebGL.js';
 import { ViewportMultiX } from './viewportMultiX.js';
+import { LoggerViewer } from './logger-viewer.js';
+import { Dragger } from './dragger.js';
+import { logo_svg } from './logo.js';
 
 
 class Tool {
@@ -113,6 +116,24 @@ class Application {
                     "user-select": "none",
                     "margin": "0em",
                 },
+            },
+            menuBar: {
+                display: "flex",
+                "flex-direction": "row",
+                "justify-content": "end",
+                background: "#333",
+            },
+            logo: {
+                display: "flex",
+                "flex-direction": "row",
+                "justify-content": "end",
+                "padding": "0.2em",
+
+                "& svg": {
+                    width: "1.5em",
+                    height: "100%",
+                }
+
             },
             screen: {
                 "flex-grow": 1,
@@ -331,10 +352,16 @@ class Application {
         if (this.m_viewport.elements.length > 1) {
             extraVPs.push(Van.tags.div({ class: this.m_classes.extraViewport }, this.m_viewport.elements[1]));
         }
+
+        const logo = text2htmlElement(logo_svg("#555", "#AAA"));
         return Van.tags.div({ class: this.m_classes.container },
-            () => {
-                return Van.tags.div({ class: this.m_classes.title }, Van.tags.h1("2D Data Viewer"));
-            },
+            Van.tags.div(
+                { class: this.m_classes.menuBar },
+                Van.tags.div({ class: this.m_classes.logo }, logo)
+            ),
+            // () => {
+            //     return Van.tags.div({ class: this.m_classes.title }, Van.tags.h1("2D Data Viewer"));
+            // },
             Van.tags.div({ class: this.m_classes.screen },
                 this.m_commandLineBar,
                 this.ObjectFilter,
