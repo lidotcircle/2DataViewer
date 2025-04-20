@@ -73,6 +73,11 @@ class Dragger {
             closeIcon: true,
             minimizeIcon: true,
             maximizeIcon: true,
+            zIndex: 1,
+            initTop: null,
+            initLeft: null,
+            initWidth: null,
+            initHeight: null,
             ...options
         };
 
@@ -94,11 +99,27 @@ class Dragger {
           */
         this.element = null;
 
+        const windowxOpt = {};
+        if (this.options.initTop) {
+            windowxOpt.top = this.options.initTop;
+        }
+        if (this.options.initLeft) {
+            windowxOpt.left = this.options.initLeft;
+        }
+        if (this.options.initWidth) {
+            windowxOpt.width = this.options.initWidth;
+        }
+        if (this.options.initHeight) {
+            windowxOpt.height = this.options.initHeight;
+        }
+
         const { classes } = jss.createStyleSheet({
             windowx: {
                 "position": 'absolute',
                 display: 'flex',
                 'flex-direction': 'row',
+                'z-index': this.options.zIndex,
+                ...windowxOpt,
             },
             windowh: {
                 'flex-grow': 1,

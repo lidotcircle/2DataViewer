@@ -14,6 +14,7 @@ import { ViewportMultiX } from './viewportMultiX.js';
 import { LoggerViewer } from './logger-viewer.js';
 import { Dragger } from './dragger.js';
 import { logo_svg } from './logo.js';
+import { ObjectViewer } from './object-viewer.js';
 
 
 class Tool {
@@ -83,6 +84,8 @@ class Application {
             maximizeIcon: true,
             draggable: true,
             resizable: true,
+            initTop: '28%',
+            initLeft: '28%',
         };
         loggerDraggerOptions.minimizeTarget = () => {
             if (this.m_logoButton) {
@@ -198,7 +201,7 @@ class Application {
                     left: "10vw",
                     top: "10vw",
                 },
-                "z-index": 100,
+                "z-index": 1,
                 "overflow": "hidden",
                 "border-radius": "0.2em",
                 border: "1em red",
@@ -245,6 +248,9 @@ class Application {
                     color: "white",
                 },
             },
+            globalTools: {
+                'z-index': 2,
+            },
         }).attach();
         this.m_classes = classes;
 
@@ -253,6 +259,12 @@ class Application {
 
         /** @private */
         this.m_commandLineBar = new CommandLine(this);
+
+        /** @private */
+        this.m_objectViewer = new ObjectViewer();
+        this.ObjectManager
+            .selectedObjectsObservable
+            .subscribe((objs) => this.m_objectViewer.showObjects(objs));
 
         /** @private */
         this.m_hoverPositionSubject = new Subject();
@@ -361,6 +373,10 @@ class Application {
         return this.m_opDispatcher.ObjectFilter;
     }
 
+    get ObjectViewer() {
+        return this.m_objectViewer;
+    }
+
     get CommandLineBar() {
         return this.m_commandLineBar;
     }
@@ -414,14 +430,18 @@ class Application {
             //     return Van.tags.div({ class: this.m_classes.title }, Van.tags.h1("2D Data Viewer"));
             // },
             Van.tags.div({ class: this.m_classes.screen },
-                this.m_commandLineBar,
-                this.ObjectFilter,
                 this.m_viewport.elements[0],
                 this.m_appEvents.element,
             ),
             this.renderTools.bind(this),
             this.m_frameLoader,
             ...extraVPs,
+            Van.tags.div({ class: this.m_classes.globalTools }, [
+                this.m_commandLineBar,
+                this.ObjectFilter,
+                this.m_objectViewer,
+                this.m_loggerDragger,
+            ]),
         );
     }
 };

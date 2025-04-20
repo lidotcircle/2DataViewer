@@ -92,7 +92,7 @@ class LoggerViewer {
                         'user-select': 'none',
                         'border-bottom': '1pt black solid',
                     }),
-                }, "LoggerViewer"),
+                }, "Logger Viewer"),
             van.list(
                 van.tags.ul(
                     { class: `${this.m_classes.logList}` },

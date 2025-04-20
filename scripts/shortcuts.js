@@ -1,12 +1,10 @@
 import { Application } from './application.js';
-import { ObjectViewer } from './object-viewer.js';
 
 
 /** 
   * @param {Application} app
-  * @param {ObjectViewer} objViewer
   */
-function SetupShortcuts(app, objViewer) {
+function SetupShortcuts(app) {
     const objMgr = app.ObjectManager;
     const loader = app.FrameLoader;
 
@@ -17,7 +15,7 @@ function SetupShortcuts(app, objViewer) {
                 app.CommandLineBar.hide();
             }
         } else if (event.key === 'i' && event.ctrlKey && !event.shiftKey) {
-            objViewer.toggle();
+            app.ObjectViewer.toggle();
         } else if (event.key === 'm' && event.ctrlKey && !event.shiftKey) {
             app.Settings.showFilter = !app.Settings.showFilter;
         } else if (event.key === 'Delete') {

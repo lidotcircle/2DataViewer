@@ -209,7 +209,6 @@ class ObjectFilter {
                 top: "5%",
                 right: "0em",
                 "overflow-y": "scroll",
-                "z-index": 1,
                 "&::-webkit-scrollbar": {
                     width: "0.3em",
                     height: "0.3em",
@@ -308,7 +307,6 @@ class ObjectFilter {
                 },
             },
             objectFilterInfo: {
-                "z-index": "999",
                 position: "relative",
                 padding: "0.5em",
                 "border-radius": "0.2em",

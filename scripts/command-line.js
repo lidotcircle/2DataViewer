@@ -40,10 +40,9 @@ class CommandLine {
                 height: "2em",
                 position: "absolute",
                 background: "rgba(45, 68, 108, 0.3)",
-                bottom: "5%",
+                bottom: "8em",
                 left: "10%",
                 "border-radius": "0.5em",
-                "z-index": 99,
             },
             cmdlineHide: {
                 display: "none",

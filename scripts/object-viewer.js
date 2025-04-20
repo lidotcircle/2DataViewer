@@ -38,11 +38,9 @@ class ObjectViewer {
                 "min-width": "100%",
                 background: "RGBA(255, 255, 255, 0.5)",
                 position: "relative",
-                "z-index": "999",
                 padding: "0.5em",
                 "border-radius": "0.2em",
                 margin: [0],
-
             },
             objectViewerItem: {
                 "padding": "0em 0.5em",
